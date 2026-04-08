@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ChromaDB
+data/chroma_db/
+
+# BM25 Index
+data/bm25_index.pkl
+
+# Questions store
+data/questions_store.json
+
+# OS
+.DS_Store
+Thumbs.db
