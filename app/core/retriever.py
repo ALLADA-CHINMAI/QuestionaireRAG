@@ -3,7 +3,7 @@ Retriever: hybrid search pipeline with Reciprocal Rank Fusion (RRF).
 
 Full pipeline for a single customer query:
   1. Load + parse customer SOP/SOW PDFs via ingestor.
-  2. Summarize key security topics with Claude (embedder).
+  2. Summarize key security topics with Azure OpenAI gpt-4o (embedder).
   3. Run dense search — embed the summary, query ChromaDB by cosine similarity.
   4. Run sparse search — tokenize the summary, score all questions via BM25.
   5. Merge both ranked lists using Reciprocal Rank Fusion.
@@ -99,7 +99,7 @@ def retrieve_for_customer(
     Returns:
         Dict with keys:
             customer_id      — echoed from input
-            context_summary  — Claude-generated summary used as the query
+            context_summary  — Azure OpenAI-generated summary used as the query
             total_results    — number of questions returned (= top_k)
             questions        — ranked list of question dicts with scores
     """
@@ -112,11 +112,11 @@ def retrieve_for_customer(
     customer_text = load_customer_docs(customer_dir)
 
     # ------------------------------------------------------------------
-    # Step 2 — Summarize with Claude to produce a focused search query
+    # Step 2 — Summarize with Azure OpenAI gpt-4o to produce a focused search query
     # The summary highlights security topics, compliance needs, and risk
     # areas — the themes that map most directly onto CAIQ domains.
     # ------------------------------------------------------------------
-    print("Summarizing customer context with Claude...")
+    print("Summarizing customer context with Azure OpenAI gpt-4o...")
     context_summary = summarize_customer_context(customer_text)
     print(f"  Summary: {context_summary[:200]}...")
 

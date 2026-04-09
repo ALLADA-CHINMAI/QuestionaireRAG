@@ -11,7 +11,7 @@ Two responsibilities:
        - summarize_customer_context() — condense customer SOP/SOW text into
          a focused, security-themed summary used as the RAG query.
 
-Uses Azure AD authentication with client credentials flow.
+Uses Azure AD authentication + subscription key for Azure API Management.
 """
 
 import os
@@ -19,6 +19,7 @@ from typing import List
 from openai import AzureOpenAI
 from azure.identity import ClientSecretCredential
 import time
+import httpx
 
 
 # ---------------------------------------------------------------------------
@@ -63,15 +64,22 @@ def _get_token() -> str:
 def _get_openai_client() -> AzureOpenAI:
     """
     Return (or create) the shared Azure OpenAI client.
-    Note: Token is refreshed on each request via azure_ad_token_provider.
+    Uses Azure AD token in Authorization header + api-key for API Management.
     """
     global _openai_client
     if _openai_client is None:
-        print("Initializing Azure OpenAI client with Azure AD authentication...")
+        print("Initializing Azure OpenAI client with Azure AD + subscription key...")
+        
+        # Get initial token
+        token = _get_token()
+        
         _openai_client = AzureOpenAI(
             azure_endpoint=os.environ["OPENAI_ENDPOINT"],
-            azure_ad_token_provider=_get_token,
-            api_version="2024-02-01"
+            api_key=os.environ["OPENAI_API_KEY"],
+            api_version="2024-08-01-preview",
+            default_headers={
+                "Authorization": f"Bearer {token}"
+            }
         )
         print("  Azure OpenAI client ready.")
     return _openai_client
