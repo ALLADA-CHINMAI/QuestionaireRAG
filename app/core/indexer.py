@@ -1,73 +1,47 @@
 """
-Indexer: builds and persists the hybrid search indexes from the CAIQ dataset.
+Indexer: builds and indexes the CAIQ dataset to Azure Cognitive Search.
 
-Two indexes are created and saved to disk:
-  1. ChromaDB (dense)  — cosine-similarity vector store for semantic search.
-  2. BM25 (sparse)     — keyword-frequency index for exact/term-based search.
-  3. questions_store   — JSON lookup table mapping question_id → full metadata,
-                         used to enrich search results at query time.
+Uses Azure Cognitive Search with hybrid indexing:
+  1. Dense indexing — 1536-dim embeddings for semantic vector search (HNSW algorithm)
+  2. Sparse indexing — BM25 keyword search built-in to Azure CS
+  3. questions_store — JSON lookup table mapping question_id → full metadata,
+                       used to enrich search results at query time.
 
-All artifacts are written under the data/ directory so they survive
-server restarts without re-indexing.
+The CAIQ questions are indexed to Azure Cognitive Search and persisted there.
+Metadata is also cached locally in questions_store.json for quick enrichment.
 """
 
 import json
-import pickle
+import os
+import logging
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 
-import chromadb
-from rank_bm25 import BM25Okapi
-
+from app.core.azure_search import AzureSearchClient
 from app.core.embedder import embed_texts
 from app.core.ingestor import load_caiq_questions
 
+logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Paths & constants
-# ---------------------------------------------------------------------------
 
-# Directory where ChromaDB persists its HNSW vector index
-CHROMA_PERSIST_DIR = "data/chroma_db"
-
-# Pickle file storing the BM25 model and the ordered list of question IDs
-BM25_INDEX_PATH = "data/bm25_index.pkl"
-
+# Configuration
 # JSON file mapping question_id → full question dict (for result enrichment)
 QUESTIONS_STORE_PATH = "data/questions_store.json"
 
-# Name of the ChromaDB collection
-COLLECTION_NAME = "caiq_questions"
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _tokenize(text: str) -> List[str]:
-    """
-    Minimal tokenizer for BM25: lowercase + whitespace split.
-
-    BM25 operates on token lists. This keeps tokenization simple and
-    consistent between index-time and query-time.
-    """
-    return text.lower().split()
-
-
-# ---------------------------------------------------------------------------
-# Index build
-# ---------------------------------------------------------------------------
+# Azure Search configuration (loaded from environment)
+AZURE_SEARCH_ENDPOINT = os.getenv("AZURE_SEARCH_ENDPOINT")
+AZURE_SEARCH_API_KEY = os.getenv("AZURE_SEARCH_API_KEY")
+AZURE_SEARCH_CAIQ_INDEX_NAME = os.getenv("AZURE_SEARCH_CAIQ_INDEX_NAME", "caiq_questions")
 
 def build_index(xlsx_path: str) -> int:
     """
-    Full index build pipeline:
+    Full index build pipeline with Azure Cognitive Search:
       1. Parse CAIQ XLSX → list of question dicts.
-      2. Embed all question texts → dense vectors (OpenAI).
-      3. Store vectors + metadata in a ChromaDB persistent collection.
-      4. Build a BM25 sparse index over the same question texts.
-      5. Persist BM25 + question store to disk.
+      2. Embed all question texts → dense vectors (OpenAI, 1536-dim).
+      3. Format and upload to Azure Cognitive Search (hybrid index with HNSW + BM25).
+      4. Cache question metadata locally in questions_store.json.
 
-    Existing indexes are dropped and rebuilt on each call so the index
+    Existing documents in Azure CS are replaced on each call so the index
     always reflects the current CAIQ file.
 
     Args:
@@ -76,105 +50,131 @@ def build_index(xlsx_path: str) -> int:
     Returns:
         Number of questions successfully indexed.
     """
+    # Verify Azure Search credentials are available
+    if not AZURE_SEARCH_ENDPOINT or not AZURE_SEARCH_API_KEY:
+        raise ValueError(
+            "Azure Cognitive Search credentials not found in environment. "
+            "Set AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_API_KEY in .env"
+        )
+    
     # Step 1 — Parse CAIQ XLSX into structured question dicts
-    print("Loading questions from CAIQ...")
+    logger.info("Loading questions from CAIQ...")
     questions = load_caiq_questions(xlsx_path)
-    print(f"  Found {len(questions)} questions")
+    logger.info(f"  Found {len(questions)} questions")
 
     # Extract parallel lists of texts and IDs for indexing
     texts = [q["question_text"] for q in questions]
     ids = [q["question_id"] for q in questions]
 
-    # ------------------------------------------------------------------
-    # Step 2 & 3 — Dense index via ChromaDB
-    # ------------------------------------------------------------------
-    print("Embedding questions (dense)...")
-    # Call OpenAI embeddings API in batches — returns 1536-dim vectors
+    # Step 2 — Embed all questions (dense vectors, 1536-dim via Azure OpenAI)
+    logger.info("Embedding questions (dense, 1536-dim)...")
     embeddings = embed_texts(texts)
+    logger.info(f"  Generated {len(embeddings)} embeddings")
 
-    # Use PersistentClient so the index survives restarts
-    client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
-
-    # Drop the old collection if it exists so we start clean
-    try:
-        client.delete_collection(COLLECTION_NAME)
-    except Exception:
-        pass  # Collection didn't exist yet — that's fine
-
-    # Create collection with cosine distance space (suited for text similarity)
-    collection = client.create_collection(
-        name=COLLECTION_NAME,
-        metadata={"hnsw:space": "cosine"},
+    # Step 3 — Initialize Azure Cognitive Search client
+    logger.info("Initializing Azure Cognitive Search client...")
+    client = AzureSearchClient(
+        endpoint=AZURE_SEARCH_ENDPOINT,
+        api_key=AZURE_SEARCH_API_KEY,
+        caiq_index_name=AZURE_SEARCH_CAIQ_INDEX_NAME
     )
+    
+    # Verify connection
+    if not client.health_check():
+        raise ConnectionError("Failed to connect to Azure Cognitive Search service")
+    
+    logger.info("Azure Cognitive Search connection verified")
 
-    # Attach domain and source as metadata for optional filtered queries later
-    metadatas = [
-        {"domain": q["domain"], "source": q["source"]}
-        for q in questions
-    ]
+    # Step 4 — Format documents for Azure CS
+    # Azure CS will handle BM25 indexing automatically (no explicit BM25 training needed)
+    logger.info("Formatting documents for Azure Cognitive Search...")
+    documents = []
+    for i, question_id in enumerate(ids):
+        q = questions[i]
+        doc = {
+            "id": question_id,  # Use question_id as document ID
+            "question_id": question_id,
+            "domain": q.get("domain", ""),
+            "question_text": q.get("question_text", ""),
+            "source": q.get("source", "CAIQ"),
+            "vector": embeddings[i],  # 1536-dim embedding for hybrid search
+        }
+        documents.append(doc)
 
-    # Add all vectors, raw text documents, and metadata in one batch call
-    collection.add(
-        ids=ids,
-        embeddings=embeddings,
-        documents=texts,
-        metadatas=metadatas,
-    )
-    print(f"  ChromaDB collection built: {len(questions)} vectors")
+    # Step 5 — Upload to Azure Cognitive Search
+    logger.info(f"Uploading {len(documents)} documents to Azure Cognitive Search...")
+    result = client.index_caiq(documents)
+    
+    succeeded = result.get("succeeded", 0)
+    failed = result.get("failed", 0)
+    
+    if failed > 0:
+        logger.warning(f"  {failed} documents failed to index")
+        errors = result.get("errors", [])
+        if errors:
+            logger.warning(f"  Sample errors: {errors[:3]}")
+    
+    logger.info(f"  Successfully indexed {succeeded} documents to Azure CS")
 
-    # ------------------------------------------------------------------
-    # Step 4 & 5 — Sparse index via BM25
-    # ------------------------------------------------------------------
-    print("Building BM25 index (sparse)...")
-
-    # Tokenize every question text for BM25 training
-    tokenized = [_tokenize(t) for t in texts]
-
-    # BM25Okapi trains on the corpus at construction time
-    bm25 = BM25Okapi(tokenized)
-
-    # Persist the BM25 model and the ordered ID list together so we can
-    # map BM25 score positions back to question_ids at query time
-    Path(BM25_INDEX_PATH).parent.mkdir(parents=True, exist_ok=True)
-    with open(BM25_INDEX_PATH, "wb") as f:
-        pickle.dump({"bm25": bm25, "ids": ids}, f)
-    print(f"  BM25 index saved to {BM25_INDEX_PATH}")
-
-    # ------------------------------------------------------------------
-    # Save full question metadata store (used for result enrichment)
-    # ------------------------------------------------------------------
+    # Step 6 — Cache question metadata locally for rapid enrichment at query time
+    logger.info(f"Caching question metadata to {QUESTIONS_STORE_PATH}...")
+    Path(QUESTIONS_STORE_PATH).parent.mkdir(parents=True, exist_ok=True)
     with open(QUESTIONS_STORE_PATH, "w") as f:
         json.dump({q["question_id"]: q for q in questions}, f, indent=2)
-    print(f"  Question store saved to {QUESTIONS_STORE_PATH}")
+    logger.info(f"  Question store saved")
 
-    return len(questions)
+    return succeeded
 
 
 # ---------------------------------------------------------------------------
 # Index loaders (called at query time)
 # ---------------------------------------------------------------------------
 
+def get_azure_search_client() -> AzureSearchClient:
+    """
+    Get initialized Azure Cognitive Search client.
+    
+    Returns:
+        AzureSearchClient instance configured from environment variables.
+    
+    Raises:
+        ValueError if credentials are not available.
+    """
+    if not AZURE_SEARCH_ENDPOINT or not AZURE_SEARCH_API_KEY:
+        raise ValueError(
+            "Azure Cognitive Search credentials not found. "
+            "Set AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_API_KEY in .env"
+        )
+    
+    return AzureSearchClient(
+        endpoint=AZURE_SEARCH_ENDPOINT,
+        api_key=AZURE_SEARCH_API_KEY,
+        caiq_index_name=AZURE_SEARCH_CAIQ_INDEX_NAME
+    )
+
+
 def load_chroma_collection():
     """
-    Load the persisted ChromaDB collection for querying.
-
-    Returns the ChromaDB Collection object ready for .query() calls.
+    [DEPRECATED] Load the persisted ChromaDB collection for querying.
+    
+    This function is kept for backwards compatibility but should not be used.
+    Use get_azure_search_client() instead for Azure Cognitive Search.
     """
-    client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
-    return client.get_collection(COLLECTION_NAME)
+    raise DeprecationWarning(
+        "Chroma DB is deprecated. Use get_azure_search_client() for Azure Cognitive Search."
+    )
 
 
 def load_bm25_index() -> Dict:
     """
-    Load the persisted BM25 index from disk.
-
-    Returns:
-        Dict with two keys:
-            'bm25' — trained BM25Okapi model
-            'ids'  — ordered list of question_ids matching BM25 corpus positions
+    [DEPRECATED] Load the persisted BM25 index from disk.
+    
+    This function is kept for backwards compatibility but should not be used.
+    Azure Cognitive Search handles BM25 indexing natively.
     """
-    with open(BM25_INDEX_PATH, "rb") as f:
-        return pickle.load(f)
+    raise DeprecationWarning(
+        "BM25 is deprecated. Azure Cognitive Search handles hybrid (BM25 + vector) search natively."
+    )
 
 
 def load_questions_store() -> Dict:
@@ -184,18 +184,28 @@ def load_questions_store() -> Dict:
     Returns:
         Dict mapping question_id (str) → question dict with all fields.
     """
+    if not os.path.exists(QUESTIONS_STORE_PATH):
+        raise FileNotFoundError(f"Questions store not found at {QUESTIONS_STORE_PATH}")
+    
     with open(QUESTIONS_STORE_PATH, "r") as f:
         return json.load(f)
 
 
 def index_is_built() -> bool:
     """
-    Check whether all index artifacts exist on disk.
+    Check whether the CAIQ index is built in Azure Cognitive Search.
 
     Used by the API to guard /query calls before /index has been run.
+    
+    Returns:
+        True if questions_store.json exists and Azure CS is reachable.
     """
-    return (
-        Path(BM25_INDEX_PATH).exists()
-        and Path(QUESTIONS_STORE_PATH).exists()
-        and Path(CHROMA_PERSIST_DIR).exists()
-    )
+    if not os.path.exists(QUESTIONS_STORE_PATH):
+        return False
+    
+    try:
+        client = get_azure_search_client()
+        return client.health_check()
+    except Exception as e:
+        logger.warning(f"Index health check failed: {str(e)}")
+        return False
