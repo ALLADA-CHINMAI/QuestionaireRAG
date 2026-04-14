@@ -8,9 +8,11 @@ from __future__ import annotations
 
 from pathlib import Path
 import logging
+import shutil
+import uuid
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 
 # Lazy imports - imported only when endpoints are called, not at module load time
@@ -59,10 +61,14 @@ class QueryResponse(BaseModel):
 
 @router.get("/health")
 def health():
-    """Quick health check - only checks if questions_store exists, doesn't check Azure connection."""
-    import os
-    questions_store_exists = os.path.exists("data/questions_store.json")
-    return {"status": "ok", "index_built": questions_store_exists}
+    """Quick health check — returns index status and question count."""
+    import os, json
+    store_path = "data/questions_store.json"
+    if os.path.exists(store_path):
+        with open(store_path) as f:
+            count = len(json.load(f))
+        return {"status": "ok", "index_built": True, "questions_indexed": count}
+    return {"status": "ok", "index_built": False, "questions_indexed": 0}
 
 
 @router.post("/index/questionnaires", response_model=IndexResponse)
@@ -70,7 +76,7 @@ def index_questionnaires():
     """Parse CAIQ XLSX and build Azure Cognitive Search index (hybrid: vector + BM25 + semantic ranking)."""
     from app.core.indexer import build_index  # Lazy import
     import traceback
-    
+
     if not Path(CAIQ_XLSX_PATH).exists():
         raise HTTPException(status_code=404, detail=f"CAIQ file not found at {CAIQ_XLSX_PATH}")
     try:
@@ -83,6 +89,34 @@ def index_questionnaires():
         print(f"\n\n=== ERROR IN INDEXING ===\n{error_details}\n=========================\n")
         raise HTTPException(status_code=500, detail=str(e))
     return IndexResponse(message="Index built successfully in Azure Cognitive Search", questions_indexed=count)
+
+
+@router.post("/index/upload-questionnaire", response_model=IndexResponse)
+async def upload_and_index_questionnaire(
+    file: UploadFile = File(...),
+):
+    """Upload a CAIQ XLSX file and build the Azure Cognitive Search index with fresh embeddings."""
+    from app.core.indexer import build_index
+    import traceback
+
+    if not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Only .xlsx files are accepted for questionnaire indexing.")
+
+    tmp_path = Path(f"/tmp/caiq_upload_{uuid.uuid4().hex}.xlsx")
+    try:
+        tmp_path.write_bytes(await file.read())
+        logger.info(f"Saved uploaded questionnaire to {tmp_path}")
+
+        count = build_index(str(tmp_path))
+        logger.info(f"Successfully indexed {count} questions from uploaded file")
+    except Exception as e:
+        error_details = f"Indexing failed: {str(e)}\n{traceback.format_exc()}"
+        logger.error(error_details)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    return IndexResponse(message=f"Indexed '{file.filename}' successfully", questions_indexed=count)
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -120,5 +154,61 @@ def query_customer(request: QueryRequest):
     except Exception as e:
         logger.error(f"Query failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+    return QueryResponse(**result)
+
+
+ALLOWED_EXTENSIONS = {".pdf", ".xlsx"}
+
+
+@router.post("/upload-and-query", response_model=QueryResponse)
+async def upload_and_query(
+    files: List[UploadFile] = File(...),
+    top_k: int = Form(default=20),
+    use_semantic_ranking: bool = Form(default=True),
+):
+    """Upload customer documents (PDF/XLSX) and get ranked CAIQ questions in one step."""
+    from app.core.indexer import index_is_built
+    from app.core.retriever import retrieve_for_customer
+
+    if not index_is_built():
+        raise HTTPException(
+            status_code=400,
+            detail="CAIQ index not built yet. Call POST /index/questionnaires first.",
+        )
+
+    # Validate file types
+    for f in files:
+        ext = Path(f.filename).suffix.lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '{f.filename}'. Only PDF and XLSX are allowed.",
+            )
+
+    session_id = f"upload_{uuid.uuid4().hex[:8]}"
+    customer_dir = Path(CUSTOMERS_BASE_DIR) / session_id
+    customer_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        for upload in files:
+            dest = customer_dir / Path(upload.filename).name
+            content = await upload.read()
+            dest.write_bytes(content)
+            logger.info(f"Saved uploaded file: {dest}")
+
+        result = retrieve_for_customer(
+            customer_id=session_id,
+            customers_base_dir=CUSTOMERS_BASE_DIR,
+            top_k=top_k,
+            use_semantic_ranking=use_semantic_ranking,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Upload-and-query failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        shutil.rmtree(customer_dir, ignore_errors=True)
 
     return QueryResponse(**result)

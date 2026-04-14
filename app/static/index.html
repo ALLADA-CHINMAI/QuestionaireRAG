@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuestionaireRAG</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #0f3460;
+      color: white;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 600; }
+    header span { font-size: 0.85rem; opacity: 0.7; margin-left: auto; }
+
+    .container { max-width: 960px; margin: 32px auto; padding: 0 20px; }
+
+    /* Step label */
+    .step-label {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px;
+    }
+    .step-num {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #0f3460; color: white;
+      font-size: 0.8rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-num.done { background: #2e7d32; }
+    .step-num.dim  { background: #b0b8c9; }
+    .step-label h2 { font-size: 1rem; font-weight: 600; color: #0f3460; }
+
+    /* Card */
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 24px 28px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      margin-bottom: 24px;
+    }
+    .card.dimmed { opacity: 0.5; pointer-events: none; }
+
+    /* Index status banner */
+    #index-status-banner {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-radius: 7px;
+      font-size: 0.87rem; font-weight: 500;
+      margin-bottom: 18px;
+    }
+    #index-status-banner.ready   { background: #eef7ee; color: #2e7d32; border: 1px solid #a8d5a2; }
+    #index-status-banner.missing { background: #fff8e1; color: #e65100; border: 1px solid #ffcc80; }
+    #index-status-banner.loading { background: #f0f3f8; color: #555;    border: 1px solid #d0d7e3; }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #c5cfe0;
+      border-radius: 8px;
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: #f8fafd;
+    }
+    .drop-zone.dragover { border-color: #0f3460; background: #eef2fa; }
+    .drop-zone svg { opacity: 0.4; margin-bottom: 8px; }
+    .drop-zone p { color: #666; font-size: 0.9rem; }
+    .drop-zone strong { color: #0f3460; cursor: pointer; }
+    .drop-zone strong:hover { text-decoration: underline; }
+    .drop-zone .hint { margin-top: 5px; font-size: 0.76rem; color: #aaa; }
+
+    /* File chips */
+    .file-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .file-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: #eef2fa; border-radius: 20px;
+      padding: 4px 12px; font-size: 0.82rem; color: #0f3460;
+    }
+    .file-chip button {
+      background: none; border: none; cursor: pointer;
+      font-size: 1rem; line-height: 1; color: #888; padding: 0;
+    }
+    .file-chip button:hover { color: #c0392b; }
+
+    /* Options row */
+    .options { display: flex; gap: 24px; align-items: flex-end; margin-top: 18px; flex-wrap: wrap; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 0.8rem; font-weight: 500; color: #555; }
+    .field input[type="number"] {
+      width: 80px; padding: 7px 10px;
+      border: 1px solid #d0d7e3; border-radius: 6px; font-size: 0.9rem;
+    }
+    .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+    .toggle {
+      position: relative; width: 40px; height: 22px;
+      background: #c5cfe0; border-radius: 20px; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle.on { background: #0f3460; }
+    .toggle::after {
+      content: ""; position: absolute; top: 3px; left: 3px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: white; transition: left 0.2s;
+    }
+    .toggle.on::after { left: 21px; }
+    .toggle-label { font-size: 0.82rem; color: #555; font-weight: 500; }
+
+    /* Buttons */
+    .btn {
+      padding: 9px 24px; border: none; border-radius: 7px;
+      font-size: 0.92rem; font-weight: 600; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primary { background: #0f3460; color: white; }
+    .btn-primary:hover:not(:disabled) { background: #16213e; }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-warning { background: #e65100; color: white; margin-top: 18px; }
+    .btn-warning:hover:not(:disabled) { background: #bf360c; }
+    .btn-warning:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* Status row */
+    .status-row {
+      display: none; align-items: center; gap: 10px;
+      margin-top: 12px; font-size: 0.87rem; color: #555;
+    }
+    .spinner {
+      width: 17px; height: 17px; border: 2px solid #c5cfe0;
+      border-top-color: #0f3460; border-radius: 50%;
+      animation: spin 0.7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Error */
+    .error-box {
+      display: none; background: #fdecea; border: 1px solid #e74c3c;
+      border-radius: 7px; padding: 11px 14px; font-size: 0.87rem;
+      color: #c0392b; margin-top: 12px;
+    }
+
+    /* Confirm overlay */
+    #confirm-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    #confirm-overlay.show { display: flex; }
+    .confirm-box {
+      background: white; border-radius: 10px; padding: 28px 32px;
+      max-width: 420px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .confirm-box h3 { font-size: 1rem; font-weight: 600; margin-bottom: 10px; }
+    .confirm-box p { font-size: 0.88rem; color: #555; line-height: 1.5; margin-bottom: 20px; }
+    .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .btn-cancel {
+      padding: 8px 20px; border: 1px solid #d0d7e3; border-radius: 7px;
+      background: white; font-size: 0.88rem; cursor: pointer;
+    }
+    .btn-cancel:hover { background: #f4f6f9; }
+    .btn-confirm {
+      padding: 8px 20px; border: none; border-radius: 7px;
+      background: #e65100; color: white; font-size: 0.88rem;
+      font-weight: 600; cursor: pointer;
+    }
+    .btn-confirm:hover { background: #bf360c; }
+
+    /* Summary */
+    #summary-box {
+      display: none; background: #eef7ee; border: 1px solid #a8d5a2;
+      border-radius: 7px; padding: 14px 18px; margin-bottom: 20px;
+    }
+    #summary-box h3 { font-size: 0.85rem; font-weight: 600; color: #2e7d32; margin-bottom: 5px; }
+    #summary-box p  { font-size: 0.85rem; color: #2e7d32; line-height: 1.5; }
+
+    /* Results */
+    #results-card { display: none; }
+    #results-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+    }
+    #results-header h2 { font-size: 1rem; font-weight: 600; color: #0f3460; }
+    #results-count { font-size: 0.82rem; color: #888; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+    thead th {
+      text-align: left; padding: 10px 12px;
+      background: #f0f3f8; color: #555; font-weight: 600;
+      border-bottom: 2px solid #dde3ee;
+    }
+    tbody tr { border-bottom: 1px solid #eef0f5; }
+    tbody tr:hover { background: #f8fafd; }
+    tbody td { padding: 10px 12px; vertical-align: top; }
+    td.rank { font-weight: 700; color: #0f3460; width: 36px; text-align: center; }
+    td.question { line-height: 1.5; max-width: 460px; }
+    .domain-badge {
+      display: inline-block; padding: 2px 9px; border-radius: 12px;
+      font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+      background: #e3ecf9; color: #0f3460;
+    }
+    .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .score-bar { flex: 1; height: 6px; background: #e0e6f0; border-radius: 3px; overflow: hidden; }
+    .score-bar-fill { height: 100%; background: #0f3460; border-radius: 3px; }
+    .score-val { font-size: 0.78rem; color: #888; min-width: 38px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/>
+  </svg>
+  <h1>QuestionaireRAG</h1>
+  <span>Security Questionnaire Recommender</span>
+</header>
+
+<div class="container">
+
+  <!-- ── STEP 1: Index Questionnaire ── -->
+  <div class="step-label">
+    <div class="step-num" id="step1-num">1</div>
+    <h2>Index Security Questionnaire</h2>
+  </div>
+
+  <div class="card" id="step1-card">
+    <div id="index-status-banner" class="loading">
+      <span id="index-status-text">Checking index status...</span>
+    </div>
+
+    <input type="file" id="q-file-input" accept=".xlsx" style="display:none" />
+    <div class="drop-zone" id="q-drop-zone" onclick="document.getElementById('q-file-input').click()">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0f3460" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+      </svg>
+      <p>Drag &amp; drop your CAIQ XLSX, or <strong>browse</strong></p>
+      <p class="hint">Only .xlsx files accepted</p>
+    </div>
+    <div class="file-list" id="q-file-list"></div>
+
+    <button class="btn btn-warning" id="index-btn" disabled onclick="confirmIndex()">
+      Index Questionnaire
+    </button>
+
+    <div class="status-row" id="index-status-row">
+      <div class="spinner"></div>
+      <span id="index-status-msg">Generating embeddings and indexing...</span>
+    </div>
+    <div class="error-box" id="index-error"></div>
+  </div>
+
+  <!-- ── STEP 2: Upload Customer Docs ── -->
+  <div class="step-label">
+    <div class="step-num dim" id="step2-num">2</div>
+    <h2>Upload Customer Documents</h2>
+  </div>
+
+  <div class="card dimmed" id="step2-card">
+    <input type="file" id="c-file-input" multiple accept=".pdf,.xlsx" style="display:none" />
+    <div class="drop-zone" id="c-drop-zone" onclick="document.getElementById('c-file-input').click()">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0f3460" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+      </svg>
+      <p>Drag &amp; drop customer SOPs / SOWs, or <strong>browse</strong></p>
+      <p class="hint">PDF and XLSX files supported &nbsp;·&nbsp; multiple files allowed</p>
+    </div>
+    <div class="file-list" id="c-file-list"></div>
+
+    <div class="options">
+      <div class="field">
+        <label for="top-k">Top K results</label>
+        <input type="number" id="top-k" value="20" min="1" max="263" />
+      </div>
+      <div class="field">
+        <label>Semantic ranking</label>
+        <div class="toggle-wrap">
+          <div class="toggle on" id="semantic-toggle" onclick="toggleSemantic()"></div>
+          <span class="toggle-label" id="semantic-label">Enabled</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="query-btn" disabled onclick="submitQuery()" style="margin-top:18px">
+      Analyse &amp; Find Questions
+    </button>
+
+    <div class="status-row" id="query-status-row">
+      <div class="spinner"></div>
+      <span id="query-status-msg">Processing documents...</span>
+    </div>
+    <div class="error-box" id="query-error"></div>
+  </div>
+
+  <!-- Results -->
+  <div id="summary-box">
+    <h3>Context Summary</h3>
+    <p id="summary-text"></p>
+  </div>
+
+  <div class="card" id="results-card">
+    <div id="results-header">
+      <h2>Recommended CAIQ Questions</h2>
+      <span id="results-count"></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Question ID</th>
+          <th>Domain</th>
+          <th>Question</th>
+          <th>Score</th>
+        </tr>
+      </thead>
+      <tbody id="results-body"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- Confirm re-index dialog -->
+<div id="confirm-overlay">
+  <div class="confirm-box">
+    <h3>Re-index questionnaire?</h3>
+    <p>This will replace the current index with fresh embeddings from the uploaded file. The process takes a few minutes. Are you sure?</p>
+    <div class="confirm-actions">
+      <button class="btn-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-confirm" onclick="runIndex()">Yes, Index Now</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── State ──
+  let qFile = null;
+  let customerFiles = [];
+  let semanticEnabled = true;
+  let indexIsReady = false;
+
+  // ── On load: check index status ──
+  window.addEventListener('DOMContentLoaded', checkIndexStatus);
+
+  async function checkIndexStatus() {
+    try {
+      const res = await fetch('/health');
+      const data = await res.json();
+      setIndexReady(data.index_built, data.questions_indexed || 0);
+    } catch {
+      setBanner('loading', 'Could not reach server');
+    }
+  }
+
+  function setIndexReady(ready, count) {
+    indexIsReady = ready;
+    if (ready) {
+      setBanner('ready', `Index ready — ${count.toLocaleString()} questions indexed`);
+      document.getElementById('step1-num').classList.add('done');
+      document.getElementById('step1-num').classList.remove('dim');
+      document.getElementById('step2-num').classList.remove('dim');
+      document.getElementById('step2-card').classList.remove('dimmed');
+    } else {
+      setBanner('missing', 'No index found — upload a questionnaire to get started');
+      document.getElementById('step2-card').classList.add('dimmed');
+      document.getElementById('step2-num').classList.add('dim');
+    }
+  }
+
+  function setBanner(type, text) {
+    const b = document.getElementById('index-status-banner');
+    b.className = 'loading';
+    b.classList.add(type === 'ready' ? 'ready' : type === 'missing' ? 'missing' : 'loading');
+    document.getElementById('index-status-text').textContent = text;
+  }
+
+  // ── Questionnaire upload ──
+  setupDrop('q-drop-zone', 'q-file-input', ['.xlsx'], (files) => {
+    qFile = files[0] || null;
+    renderChips('q-file-list', qFile ? [qFile] : [], () => { qFile = null; renderChips('q-file-list', [], null); document.getElementById('index-btn').disabled = true; });
+    document.getElementById('index-btn').disabled = !qFile;
+  }, false);
+
+  function confirmIndex() {
+    if (!qFile) return;
+    if (indexIsReady) {
+      document.getElementById('confirm-overlay').classList.add('show');
+    } else {
+      runIndex();
+    }
+  }
+  function closeConfirm() {
+    document.getElementById('confirm-overlay').classList.remove('show');
+  }
+
+  async function runIndex() {
+    closeConfirm();
+    if (!qFile) return;
+
+    setIndexLoading(true);
+    document.getElementById('index-error').style.display = 'none';
+
+    const fd = new FormData();
+    fd.append('file', qFile);
+
+    try {
+      const res = await fetch('/index/upload-questionnaire', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`);
+      setIndexReady(true, data.questions_indexed);
+    } catch (err) {
+      document.getElementById('index-error').textContent = 'Error: ' + err.message;
+      document.getElementById('index-error').style.display = 'block';
+    } finally {
+      setIndexLoading(false);
+    }
+  }
+
+  function setIndexLoading(on) {
+    document.getElementById('index-btn').disabled = on;
+    document.getElementById('index-status-row').style.display = on ? 'flex' : 'none';
+    if (on) {
+      const steps = ['Parsing XLSX...', 'Generating embeddings (this takes a few minutes)...', 'Uploading to Azure Cognitive Search...', 'Almost done...'];
+      let i = 0;
+      window._idxInterval = setInterval(() => {
+        document.getElementById('index-status-msg').textContent = steps[i++ % steps.length];
+      }, 3000);
+    } else {
+      clearInterval(window._idxInterval);
+      if (qFile) document.getElementById('index-btn').disabled = false;
+    }
+  }
+
+  // ── Customer doc upload ──
+  setupDrop('c-drop-zone', 'c-file-input', ['.pdf', '.xlsx'], (files) => {
+    files.forEach(f => { if (!customerFiles.find(x => x.name === f.name)) customerFiles.push(f); });
+    renderChips('c-file-list', customerFiles, (name) => {
+      customerFiles = customerFiles.filter(f => f.name !== name);
+      renderChips('c-file-list', customerFiles, arguments.callee);
+      document.getElementById('query-btn').disabled = customerFiles.length === 0;
+    });
+    document.getElementById('query-btn').disabled = customerFiles.length === 0;
+  }, true);
+
+  function toggleSemantic() {
+    semanticEnabled = !semanticEnabled;
+    document.getElementById('semantic-toggle').classList.toggle('on', semanticEnabled);
+    document.getElementById('semantic-label').textContent = semanticEnabled ? 'Enabled' : 'Disabled';
+  }
+
+  async function submitQuery() {
+    if (!customerFiles.length) return;
+    setQueryLoading(true);
+    clearResults();
+
+    const fd = new FormData();
+    customerFiles.forEach(f => fd.append('files', f));
+    fd.append('top_k', document.getElementById('top-k').value);
+    fd.append('use_semantic_ranking', semanticEnabled);
+
+    try {
+      const res = await fetch('/upload-and-query', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`);
+      renderResults(data);
+    } catch (err) {
+      document.getElementById('query-error').textContent = 'Error: ' + err.message;
+      document.getElementById('query-error').style.display = 'block';
+    } finally {
+      setQueryLoading(false);
+    }
+  }
+
+  function setQueryLoading(on) {
+    document.getElementById('query-btn').disabled = on;
+    document.getElementById('query-status-row').style.display = on ? 'flex' : 'none';
+    if (on) {
+      const steps = ['Extracting text...', 'Summarising with GPT-4o...', 'Running hybrid search...', 'Ranking results...'];
+      let i = 0;
+      window._qInterval = setInterval(() => {
+        document.getElementById('query-status-msg').textContent = steps[i++ % steps.length];
+      }, 2500);
+    } else {
+      clearInterval(window._qInterval);
+      if (customerFiles.length) document.getElementById('query-btn').disabled = false;
+    }
+  }
+
+  function clearResults() {
+    document.getElementById('results-card').style.display = 'none';
+    document.getElementById('summary-box').style.display = 'none';
+    document.getElementById('query-error').style.display = 'none';
+    document.getElementById('results-body').innerHTML = '';
+  }
+
+  function renderResults(data) {
+    document.getElementById('summary-text').textContent = data.context_summary;
+    document.getElementById('summary-box').style.display = 'block';
+
+    const maxScore = Math.max(...data.questions.map(q => q.score), 0.0001);
+    document.getElementById('results-body').innerHTML = data.questions.map(q => {
+      const pct = Math.round((q.score / maxScore) * 100);
+      return `<tr>
+        <td class="rank">${q.rank}</td>
+        <td><code style="font-size:0.82rem">${esc(q.question_id)}</code></td>
+        <td><span class="domain-badge">${esc(q.domain)}</span></td>
+        <td class="question">${esc(q.question)}</td>
+        <td>
+          <div class="score-bar-wrap">
+            <div class="score-bar"><div class="score-bar-fill" style="width:${pct}%"></div></div>
+            <span class="score-val">${q.score.toFixed(3)}</span>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('results-count').textContent = `${data.total_results} questions`;
+    document.getElementById('results-card').style.display = 'block';
+  }
+
+  // ── Helpers ──
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function renderChips(containerId, files, onRemove) {
+    document.getElementById(containerId).innerHTML = files.map(f => `
+      <div class="file-chip">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        ${esc(f.name)}
+        ${onRemove ? `<button onclick="removeCustomerFile('${esc(f.name)}')" title="Remove">&times;</button>` : ''}
+      </div>`).join('');
+  }
+
+  function removeCustomerFile(name) {
+    customerFiles = customerFiles.filter(f => f.name !== name);
+    renderChips('c-file-list', customerFiles, removeCustomerFile);
+    document.getElementById('query-btn').disabled = customerFiles.length === 0;
+  }
+
+  function setupDrop(zoneId, inputId, exts, onFiles, multiple) {
+    const zone = document.getElementById(zoneId);
+    const input = document.getElementById(inputId);
+    if (multiple) input.setAttribute('multiple', '');
+
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('dragover');
+      const valid = [...e.dataTransfer.files].filter(f => exts.some(ext => f.name.toLowerCase().endsWith(ext)));
+      if (valid.length) onFiles(valid);
+    });
+    input.addEventListener('change', e => {
+      onFiles([...e.target.files]);
+      e.target.value = '';
+    });
+  }
+</script>
+</body>
+</html>

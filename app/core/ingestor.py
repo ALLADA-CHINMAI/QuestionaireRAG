@@ -81,41 +81,50 @@ def load_caiq_questions(xlsx_path: str) -> List[Dict]:
 
 def load_customer_docs(customer_dir: str) -> str:
     """
-    Parse all PDFs in a customer directory and return their combined text.
+    Parse all PDFs and XLSX files in a customer directory and return their combined text.
 
-    Each PDF (SOP, SOW, etc.) is opened with PyMuPDF, all pages are
-    extracted as plain text, and the results are concatenated with a
-    filename header so downstream code can identify which doc each chunk
-    came from.
+    Each PDF is opened with PyMuPDF; each XLSX is read with openpyxl (all
+    non-empty cell values concatenated row by row). Results are concatenated
+    with a filename header so downstream code can identify which doc each
+    chunk came from.
 
     Args:
-        customer_dir: path to folder containing the customer's PDF files.
+        customer_dir: path to folder containing the customer's PDF/XLSX files.
 
     Returns:
-        Single string with all PDFs concatenated, separated by headers.
+        Single string with all documents concatenated, separated by headers.
 
     Raises:
-        FileNotFoundError: if no PDFs are found in the directory.
+        FileNotFoundError: if no supported files are found in the directory.
     """
     customer_path = Path(customer_dir)
 
-    # Collect and sort PDFs for deterministic ordering
     pdf_files = sorted(customer_path.glob("*.pdf"))
+    xlsx_files = sorted(customer_path.glob("*.xlsx"))
+    all_files = pdf_files + xlsx_files
 
-    if not pdf_files:
-        raise FileNotFoundError(f"No PDFs found in {customer_dir}")
+    if not all_files:
+        raise FileNotFoundError(f"No PDF or XLSX files found in {customer_dir}")
 
     combined_text = []
+
     for pdf_file in pdf_files:
-        # Open each PDF and concatenate text from every page
         doc = fitz.open(str(pdf_file))
         text = ""
         for page in doc:
             text += page.get_text()
         doc.close()
-
-        # Label each document section with its filename for traceability
         combined_text.append(f"=== {pdf_file.name} ===\n{text.strip()}")
 
-    # Join all documents with a blank line separator
+    for xlsx_file in xlsx_files:
+        wb = openpyxl.load_workbook(xlsx_file, read_only=True, data_only=True)
+        rows_text = []
+        for sheet in wb.worksheets:
+            for row in sheet.iter_rows(values_only=True):
+                row_values = [str(cell).strip() for cell in row if cell is not None and str(cell).strip()]
+                if row_values:
+                    rows_text.append(" | ".join(row_values))
+        wb.close()
+        combined_text.append(f"=== {xlsx_file.name} ===\n" + "\n".join(rows_text))
+
     return "\n\n".join(combined_text)

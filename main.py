@@ -14,6 +14,8 @@ logging.basicConfig(
 )
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.api.routes import router
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,12 @@ app = FastAPI(
 )
 
 app.include_router(router)
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def ui():
+    return FileResponse("app/static/index.html")
 
 
 @app.on_event("startup")
