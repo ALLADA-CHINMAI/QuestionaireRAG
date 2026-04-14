@@ -7,6 +7,12 @@ import logging
 from dotenv import load_dotenv
 load_dotenv()
 
+# Configure logging to show in console
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 from fastapi import FastAPI
 from app.api.routes import router
 
@@ -25,17 +31,7 @@ app.include_router(router)
 async def startup_event():
     """Initialize and verify Azure Cognitive Search connection on startup."""
     logger.info("QuestionaireRAG server starting up...")
-    try:
-        from app.core.indexer import get_azure_search_client
-        client = get_azure_search_client()
-        if client.health_check():
-            logger.info("✓ Azure Cognitive Search connection verified")
-        else:
-            logger.warning("⚠ Azure Cognitive Search health check returned False")
-    except ValueError as e:
-        logger.warning(f"Azure Cognitive Search not configured: {str(e)}")
-    except Exception as e:
-        logger.warning(f"Azure Cognitive Search startup check failed: {str(e)}")
+    logger.info("✓ Server ready - Azure Cognitive Search will be initialized on first use")
 
 
 @app.on_event("shutdown")

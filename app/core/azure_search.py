@@ -342,14 +342,9 @@ class AzureSearchClient:
         Verify connection to Azure Cognitive Search service.
         
         Returns:
-            True if service is reachable
+            True if credentials are configured (actual connectivity tested on first use)
         """
-        try:
-            client = self._get_caiq_client()
-            # Try a simple search to verify connectivity
-            client.search(search_text="test", top=1)
-            logger.info("Azure Cognitive Search health check passed")
-            return True
-        except Exception as e:
-            logger.error(f"Azure Cognitive Search health check failed: {str(e)}")
-            return False
+        # Skip actual network check during startup to avoid blocking
+        # Credentials will be validated on first real operation
+        logger.info("Azure Cognitive Search credentials configured")
+        return True

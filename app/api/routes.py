@@ -4,14 +4,17 @@ FastAPI routes for QuestionaireRAG.
 Now using Azure Cognitive Search with hybrid indexing (vector + BM25 + semantic ranking).
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 import logging
+from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from app.core.indexer import build_index, index_is_built
-from app.core.retriever import retrieve_for_customer
+# Lazy imports - imported only when endpoints are called, not at module load time
+# This prevents blocking during FastAPI startup/docs generation
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +44,7 @@ class QuestionResult(BaseModel):
     domain: str
     question: str
     score: float = Field(..., description="Hybrid search score (vector + BM25)")
-    semantic_score: float | None = Field(default=None, description="Semantic ranking score (if enabled)")
+    semantic_score: Optional[float] = Field(default=None, description="Semantic ranking score (if enabled)")
     source: str
 
 
@@ -49,19 +52,25 @@ class QueryResponse(BaseModel):
     customer_id: str
     context_summary: str
     total_results: int
-    questions: list[QuestionResult]
+    questions: List[QuestionResult]
 
 
 # --- Endpoints ---
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "index_built": index_is_built()}
+    """Quick health check - only checks if questions_store exists, doesn't check Azure connection."""
+    import os
+    questions_store_exists = os.path.exists("data/questions_store.json")
+    return {"status": "ok", "index_built": questions_store_exists}
 
 
 @router.post("/index/questionnaires", response_model=IndexResponse)
 def index_questionnaires():
     """Parse CAIQ XLSX and build Azure Cognitive Search index (hybrid: vector + BM25 + semantic ranking)."""
+    from app.core.indexer import build_index  # Lazy import
+    import traceback
+    
     if not Path(CAIQ_XLSX_PATH).exists():
         raise HTTPException(status_code=404, detail=f"CAIQ file not found at {CAIQ_XLSX_PATH}")
     try:
@@ -69,7 +78,9 @@ def index_questionnaires():
         count = build_index(CAIQ_XLSX_PATH)
         logger.info(f"Successfully indexed {count} questions")
     except Exception as e:
-        logger.error(f"Indexing failed: {str(e)}")
+        error_details = f"Indexing failed: {str(e)}\n{traceback.format_exc()}"
+        logger.error(error_details)
+        print(f"\n\n=== ERROR IN INDEXING ===\n{error_details}\n=========================\n")
         raise HTTPException(status_code=500, detail=str(e))
     return IndexResponse(message="Index built successfully in Azure Cognitive Search", questions_indexed=count)
 
@@ -80,6 +91,9 @@ def query_customer(request: QueryRequest):
     
     Uses Azure Cognitive Search hybrid search (vector + BM25 + optional semantic ranking).
     """
+    from app.core.indexer import index_is_built  # Lazy import
+    from app.core.retriever import retrieve_for_customer  # Lazy import
+    
     customer_dir = Path(CUSTOMERS_BASE_DIR) / request.customer_id
     if not customer_dir.exists():
         raise HTTPException(
