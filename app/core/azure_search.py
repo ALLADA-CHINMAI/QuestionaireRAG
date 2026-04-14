@@ -212,7 +212,6 @@ class AzureSearchClient:
                 "query_type": QueryType.SEMANTIC,  # Enables hybrid + semantic
                 "select": ["id", "question_id", "domain", "question_text", "source", "doc_name", "metadata"],
                 "top": top,
-                "query_language": "en-us",
             }
             
             # Add semantic ranking if enabled
