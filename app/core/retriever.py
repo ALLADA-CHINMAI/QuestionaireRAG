@@ -17,11 +17,15 @@ Azure Cognitive Search handles hybrid search natively:
 """
 
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 
-from app.core.embedder import embed_query, summarize_customer_context
-from app.core.indexer import get_azure_search_client, load_questions_store
-from app.core.ingestor import load_customer_docs
+from app.core.embedder import embed_query, embed_texts, summarize_customer_context
+from app.core.indexer import (
+    get_azure_search_client,
+    load_questions_store,
+    load_custom_questions_store,
+)
+from app.core.ingestor import load_customer_docs, load_sow_file
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +130,187 @@ def retrieve_for_customer(
     return {
         "customer_id": customer_id,
         "context_summary": context_summary,
+        "total_results": len(results),
+        "questions": results,
+    }
+
+
+# ---------------------------------------------------------------------------
+# New SOW-based retrieval pipeline
+# ---------------------------------------------------------------------------
+
+# Priority boost applied to questions matched directly from the SOW
+# (vs. questions reached via an SOP intermediary)
+SOW_DIRECT_BOOST = 1.5
+
+# Maximum SOW chunks to process per file (keeps Azure Search call count bounded)
+MAX_CHUNKS_PER_SOW = 15
+
+# SOP matches per SOW chunk (used for the SOP-mediated path)
+TOP_SOP_MATCHES = 5
+
+# Direct question matches per SOW chunk
+TOP_DIRECT_QUESTIONS = 10
+
+# Questions retrieved per SOP capability match
+TOP_QUESTIONS_PER_CAPABILITY = 5
+
+
+def retrieve_for_sow(
+    sow_file_paths: List[str],
+    top_n: int = 20,
+) -> Dict:
+    """
+    Retrieve and rank custom questions for a set of SOW files.
+
+    Two retrieval paths are combined:
+      1. **Direct** (SOW → Questions): each SOW chunk is searched directly
+         against the questions index.  Results get a 1.5× score boost to
+         prioritise questions with strong SOW alignment.
+      2. **SOP-mediated** (SOW → SOP → Questions): each SOW chunk is first
+         matched to relevant SOP chunks; the SOP capability label is then used
+         to bias the questions search toward that capability's domain.
+
+    Duplicate questions (same question_id found via both paths) are resolved
+    by keeping the higher score.
+
+    Args:
+        sow_file_paths: list of paths to SOW files (.docx / .pdf / .xlsx).
+        top_n:          maximum number of questions to return.
+
+    Returns:
+        Dict with keys:
+            total_results  — number of questions returned
+            questions      — ranked list of question dicts, each containing:
+                rank, question_id, category, question, score,
+                match_path, sow_context, sow_filename,
+                sop_context (nullable), sop_capability (nullable)
+    """
+    # ── Step 1: Parse + chunk all SOW files ──────────────────────────────────
+    all_chunks: List[Dict] = []
+    for path in sow_file_paths:
+        chunks = load_sow_file(path)
+        # Sample evenly if the file produces too many chunks
+        if len(chunks) > MAX_CHUNKS_PER_SOW:
+            step = max(1, len(chunks) // MAX_CHUNKS_PER_SOW)
+            chunks = chunks[::step][:MAX_CHUNKS_PER_SOW]
+        all_chunks.extend(chunks)
+        logger.info(f"SOW '{path}' → {len(chunks)} chunks (after sampling)")
+
+    if not all_chunks:
+        logger.warning("No SOW chunks produced — returning empty results")
+        return {"total_results": 0, "questions": []}
+
+    # ── Step 2: Batch-embed all SOW chunks (single API call) ─────────────────
+    logger.info(f"Embedding {len(all_chunks)} SOW chunks...")
+    chunk_texts = [c["chunk_text"] for c in all_chunks]
+    chunk_embeddings = embed_texts(chunk_texts)
+
+    # ── Step 3: Search ────────────────────────────────────────────────────────
+    azure_client = get_azure_search_client()
+    questions_store = load_custom_questions_store()
+
+    # Accumulator: question_id → best candidate
+    candidates: Dict[str, Dict] = {}
+
+    def _update_candidate(
+        qid: str,
+        score: float,
+        path_label: str,
+        sow_chunk: str,
+        sow_filename: str,
+        sop_chunk: Optional[str],
+        sop_capability: Optional[str],
+    ) -> None:
+        """Keep only the highest-score entry per question."""
+        if qid not in candidates or score > candidates[qid]["score"]:
+            candidates[qid] = {
+                "score": score,
+                "match_path": path_label,
+                "sow_context": sow_chunk[:150],
+                "sow_filename": sow_filename,
+                "sop_context": sop_chunk[:150] if sop_chunk else None,
+                "sop_capability": sop_capability,
+            }
+
+    for chunk, embedding in zip(all_chunks, chunk_embeddings):
+        chunk_text = chunk["chunk_text"]
+        filename = chunk["filename"]
+
+        # ── Path 1 (Direct SOW → Questions) ──────────────────────────────────
+        direct = azure_client.search_questions_hybrid(
+            query_vector=embedding,
+            query_text=chunk_text,
+            top=TOP_DIRECT_QUESTIONS,
+        )
+        for q in direct.get("results", []):
+            qid = q.get("question_id")
+            if not qid:
+                continue
+            _update_candidate(
+                qid=qid,
+                score=q["score"] * SOW_DIRECT_BOOST,
+                path_label="Direct SOW match",
+                sow_chunk=chunk_text,
+                sow_filename=filename,
+                sop_chunk=None,
+                sop_capability=None,
+            )
+
+        # ── Path 2 (SOW → SOP → Questions) ───────────────────────────────────
+        sop_matches = azure_client.search_sop_hybrid(
+            query_vector=embedding,
+            query_text=chunk_text,
+            top=TOP_SOP_MATCHES,
+        )
+        seen_capabilities: set = set()
+        for sop in sop_matches.get("results", []):
+            capability = sop.get("capability", "").strip()
+            if not capability or capability in seen_capabilities:
+                continue
+            seen_capabilities.add(capability)
+
+            q_via_sop = azure_client.search_questions_hybrid(
+                query_vector=embedding,
+                query_text=f"{chunk_text[:300]} {capability}",
+                top=TOP_QUESTIONS_PER_CAPABILITY,
+            )
+            for q in q_via_sop.get("results", []):
+                qid = q.get("question_id")
+                if not qid:
+                    continue
+                _update_candidate(
+                    qid=qid,
+                    score=q["score"],  # base score — no boost
+                    path_label=f"SOW \u2192 SOP ({capability})",
+                    sow_chunk=chunk_text,
+                    sow_filename=filename,
+                    sop_chunk=sop.get("chunk_text"),
+                    sop_capability=capability,
+                )
+
+    # ── Step 4: Rank and return top_n ────────────────────────────────────────
+    ranked = sorted(candidates.items(), key=lambda x: x[1]["score"], reverse=True)[:top_n]
+
+    results = []
+    for rank, (qid, info) in enumerate(ranked, start=1):
+        q_meta = questions_store.get(qid, {})
+        results.append({
+            "rank": rank,
+            "question_id": qid,
+            "category": q_meta.get("category", ""),
+            "question": q_meta.get("question_text", ""),
+            "score": round(info["score"], 6),
+            "match_path": info["match_path"],
+            "sow_context": info["sow_context"],
+            "sow_filename": info["sow_filename"],
+            "sop_context": info.get("sop_context"),
+            "sop_capability": info.get("sop_capability"),
+        })
+
+    logger.info(f"retrieve_for_sow: returning {len(results)} questions from {len(candidates)} candidates")
+
+    return {
         "total_results": len(results),
         "questions": results,
     }

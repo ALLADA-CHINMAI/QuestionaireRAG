@@ -15,292 +15,240 @@ logger = logging.getLogger(__name__)
 
 class AzureSearchClient:
     """
-    Client for Azure Cognitive Search with hybrid indexing support.
-    
+    Client for Azure Cognitive Search with hybrid indexing support (v6).
+
     Supports:
     - Hybrid search: vector embeddings + BM25 keyword search in single query
     - Semantic ranking for relevance reranking
-    - Multi-index management (CAIQ questions + per-customer document indexes)
+    - Multi-index management:
+        * SOP chunks index (documents chunked from SOPs)
+        * Question items index (questions from uploaded Excel)
+        * Semantic mappings index (SOP capability → Question category)
     """
-    
-    def __init__(self, endpoint: str, api_key: str, caiq_index_name: str = "caiq_questions"):
+
+    def __init__(
+        self,
+        endpoint: str,
+        api_key: str,
+        sop_index_name: str = "sop_chunks",
+        questions_index_name: str = "question_items",
+        mappings_index_name: str = "semantic_mappings",
+    ):
         """
-        Initialize Azure Search client.
-        
+        Initialize Azure Search client (v6).
+
         Args:
-            endpoint: Azure Cognitive Search endpoint (e.g., https://myservice.search.windows.net)
-            api_key: Azure Cognitive Search API key
-            caiq_index_name: Name of the CAIQ questions index
+            endpoint:             Azure Cognitive Search endpoint
+            api_key:              Azure Cognitive Search API key
+            sop_index_name:       Name of the SOP chunks index
+            questions_index_name: Name of the questions items index
+            mappings_index_name:  Name of the semantic mappings index
         """
         self.endpoint = endpoint
         self.api_key = api_key
-        self.caiq_index_name = caiq_index_name
+        self.sop_index_name = sop_index_name
+        self.questions_index_name = questions_index_name
+        self.mappings_index_name = mappings_index_name
         self.credentials = AzureKeyCredential(api_key)
-        
+
         # Will be lazily initialized
-        self._caiq_client: Optional[SearchClient] = None
-        self._customer_clients: Dict[str, SearchClient] = {}
+        self._sop_client: Optional[SearchClient] = None
+        self._questions_client: Optional[SearchClient] = None
+        self._mappings_client: Optional[SearchClient] = None
     
-    def _get_caiq_client(self) -> SearchClient:
-        """Get or create SearchClient for CAIQ index."""
-        if self._caiq_client is None:
-            self._caiq_client = SearchClient(
+    def _get_mappings_client(self) -> SearchClient:
+        """Get or create SearchClient for the semantic mappings index."""
+        if self._mappings_client is None:
+            self._mappings_client = SearchClient(
                 endpoint=self.endpoint,
-                index_name=self.caiq_index_name,
-                credential=self.credentials
+                index_name=self.mappings_index_name,
+                credential=self.credentials,
             )
-        return self._caiq_client
-    
-    def _get_customer_client(self, customer_id: str) -> SearchClient:
-        """Get or create SearchClient for customer documents index."""
-        if customer_id not in self._customer_clients:
-            index_name = f"customer_docs_{customer_id}"
-            self._customer_clients[customer_id] = SearchClient(
+        return self._mappings_client
+
+    def _get_sop_client(self) -> SearchClient:
+        """Get or create SearchClient for the SOP chunks index."""
+        if self._sop_client is None:
+            self._sop_client = SearchClient(
                 endpoint=self.endpoint,
-                index_name=index_name,
-                credential=self.credentials
+                index_name=self.sop_index_name,
+                credential=self.credentials,
             )
-        return self._customer_clients[customer_id]
+        return self._sop_client
+
+    def _get_questions_client(self) -> SearchClient:
+        """Get or create SearchClient for the custom questions index."""
+        if self._questions_client is None:
+            self._questions_client = SearchClient(
+                endpoint=self.endpoint,
+                index_name=self.questions_index_name,
+                credential=self.credentials,
+            )
+        return self._questions_client
+
+
     
-    def index_caiq(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+    
+    # ------------------------------------------------------------------
+    # SOP chunks index
+    # ------------------------------------------------------------------
+
+    def index_sop_chunks(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Index CAIQ questions into Azure Cognitive Search.
-        
-        Args:
-            documents: List of documents with structure:
-                {
-                    "id": "unique_id",
-                    "question_id": "IAM-01.1",
-                    "domain": "IAM",
-                    "question_text": "...",
-                    "source": "CAIQ",
-                    "vector": [embeddings_array_1536_dims],
-                    ...
-                }
-        
-        Returns:
-            Dict with indexing results: {"succeeded": int, "failed": int, "errors": [...]}
+        Upload SOP text chunks to the SOP chunks index.
+
+        Expected document structure:
+            {
+                "id":          "stem_0",          # sanitized key
+                "chunk_id":    "SOP_Cloud_0",
+                "filename":    "CloudSOP.docx",
+                "capability":  "Cloud Security",
+                "chunk_text":  "...",
+                "chunk_index": 0,
+                "vector":      [1536-dim float list],
+            }
         """
         try:
-            client = self._get_caiq_client()
+            client = self._get_sop_client()
             result = client.upload_documents(documents)
-            
-            failed_docs = [r for r in result if not r.succeeded]
-            success_count = len(result) - len(failed_docs)
-            
-            logger.info(f"CAIQ indexing: {success_count} succeeded, {len(failed_docs)} failed")
-            
-            if failed_docs:
-                logger.error(f"Failed documents: {failed_docs}")
-            
-            return {
-                "succeeded": success_count,
-                "failed": len(failed_docs),
-                "errors": failed_docs
-            }
+            failed = [r for r in result if not r.succeeded]
+            succeeded = len(result) - len(failed)
+            logger.info(f"SOP indexing: {succeeded} succeeded, {len(failed)} failed")
+            if failed:
+                logger.error(f"Failed SOP docs: {failed[:3]}")
+            return {"succeeded": succeeded, "failed": len(failed), "errors": failed}
         except Exception as e:
-            logger.error(f"Error indexing CAIQ documents: {str(e)}")
+            logger.error(f"Error indexing SOP chunks: {e}")
             raise
-    
-    def index_customer_docs(self, customer_id: str, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+    def index_questions(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Index customer documents into a per-customer index.
-        
-        Args:
-            customer_id: Customer identifier
-            documents: List of documents with structure:
-                {
-                    "id": "unique_doc_id",
-                    "customer_id": "customer_id",
-                    "doc_name": "document_filename.pdf",
-                    "content_chunk": "text content...",
-                    "chunk_vector": [embeddings_array_1536_dims],
-                    "metadata": {...}
-                }
-        
-        Returns:
-            Dict with indexing results
+        Upload custom questions to the questions index.
+
+        Expected document structure:
+            {
+                "id":            "IAM_001",       # sanitized key
+                "question_id":   "IAM_001",
+                "category":      "IAM",
+                "question_text": "Are identities managed...",
+                "vector":        [1536-dim float list],
+            }
         """
         try:
-            client = self._get_customer_client(customer_id)
+            client = self._get_questions_client()
             result = client.upload_documents(documents)
-            
-            failed_docs = [r for r in result if not r.succeeded]
-            success_count = len(result) - len(failed_docs)
-            
-            logger.info(f"Customer {customer_id} docs indexing: {success_count} succeeded, {len(failed_docs)} failed")
-            
-            if failed_docs:
-                logger.error(f"Failed documents: {failed_docs}")
-            
-            return {
-                "succeeded": success_count,
-                "failed": len(failed_docs),
-                "errors": failed_docs
-            }
+            failed = [r for r in result if not r.succeeded]
+            succeeded = len(result) - len(failed)
+            logger.info(f"Questions indexing: {succeeded} succeeded, {len(failed)} failed")
+            if failed:
+                logger.error(f"Failed question docs: {failed[:3]}")
+            return {"succeeded": succeeded, "failed": len(failed), "errors": failed}
         except Exception as e:
-            logger.error(f"Error indexing customer {customer_id} documents: {str(e)}")
+            logger.error(f"Error indexing questions: {e}")
             raise
-    
-    def search_hybrid(
+
+    def search_sop_hybrid(
         self,
         query_vector: List[float],
         query_text: str,
-        index_type: str = "caiq",
-        customer_id: Optional[str] = None,
-        top: int = 50,
-        filter_query: Optional[str] = None,
+        top: int = 5,
+        capability_filter: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Perform hybrid search (vector + BM25) with optional semantic ranking.
-        
+        Hybrid search (vector + BM25) on the SOP chunks index.
+
         Args:
-            query_vector: 1536-dimensional embedding vector
-            query_text: Original query text for BM25 keyword search
-            index_type: "caiq" or "customer_docs"
-            customer_id: Required if index_type is "customer_docs"
-            top: Number of top results to return
-            filter_query: Optional OData filter (e.g., "domain eq 'IAM'")
-        
+            query_vector:       1536-dim embedding of the SOW chunk.
+            query_text:         Raw SOW chunk text for BM25 matching.
+            top:                Number of SOP chunks to return.
+            capability_filter:  OData filter on the capability field
+                                (e.g. "capability eq 'Cloud Security'").
+
         Returns:
-            Dict with search results:
-                {
-                    "results": [
-                        {
-                            "id": "...",
-                            "question_id": "...",
-                            "domain": "...",
-                            "question_text": "...",
-                            "score": 2.5,  # Hybrid score
-                            ...
-                        }
-                    ],
-                    "total_count": int
-                }
+            {"results": [...], "total_count": int}
         """
         try:
-            # Select appropriate client
-            if index_type == "caiq":
-                client = self._get_caiq_client()
-            elif index_type == "customer_docs":
-                if not customer_id:
-                    raise ValueError("customer_id required for customer_docs index_type")
-                client = self._get_customer_client(customer_id)
-            else:
-                raise ValueError(f"Invalid index_type: {index_type}")
-            
-            # Create vectorized query for hybrid search
+            client = self._get_sop_client()
             vector_query = VectorizedQuery(
                 vector=query_vector,
-                k_nearest_neighbors=50,  # Retrieve top 50 vector matches
-                fields="vector"  # or "chunk_vector" for customer docs
+                k_nearest_neighbors=50,
+                fields="vector",
             )
-            
-            # Build select fields based on index type
-            if index_type == "caiq":
-                select_fields = ["id", "question_id", "domain", "question_text", "source"]
-            else:  # customer_docs
-                select_fields = ["id", "question_id", "domain", "question_text", "source", "doc_name", "metadata"]
-
-            # Build search parameters
-            search_params = {
+            params: Dict[str, Any] = {
                 "vector_queries": [vector_query],
                 "search_text": query_text,
-                "select": select_fields,
+                "select": ["id", "chunk_id", "filename", "capability", "chunk_text", "chunk_index"],
                 "top": top,
             }
-            
-            # Add filter if provided
-            if filter_query:
-                search_params["filter"] = filter_query
-            
-            # Execute hybrid search
-            results = client.search(**search_params)
-            
-            # Parse results
-            parsed_results = []
-            total_count = 0
-            
-            for result in results:
-                parsed_results.append({
-                    "id": result.get("id"),
-                    "question_id": result.get("question_id"),
-                    "domain": result.get("domain"),
-                    "question_text": result.get("question_text"),
-                    "source": result.get("source"),
-                    "doc_name": result.get("doc_name"),
-                    "metadata": result.get("metadata"),
-                    "score": result.get("@search.score"),
+            if capability_filter:
+                params["filter"] = f"capability eq '{capability_filter}'"
+
+            parsed = []
+            for r in client.search(**params):
+                parsed.append({
+                    "id": r.get("id"),
+                    "chunk_id": r.get("chunk_id"),
+                    "filename": r.get("filename"),
+                    "capability": r.get("capability"),
+                    "chunk_text": r.get("chunk_text"),
+                    "chunk_index": r.get("chunk_index"),
+                    "score": r.get("@search.score"),
                 })
-                total_count += 1
-            
-            return {
-                "results": parsed_results,
-                "total_count": total_count,
-                "query_vector_dims": len(query_vector),
-            }
-        
+            return {"results": parsed, "total_count": len(parsed)}
         except Exception as e:
-            logger.error(f"Error in hybrid search: {str(e)}")
+            logger.error(f"SOP hybrid search error: {e}")
             raise
-    
-    def search_caiq_hybrid(
+
+    def search_questions_hybrid(
         self,
         query_vector: List[float],
         query_text: str,
-        top: int = 50,
-        domain_filter: Optional[str] = None,
+        top: int = 10,
+        category_filter: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Convenience method for searching CAIQ questions with optional domain filter.
-        
+        Hybrid search (vector + BM25) on the custom questions index.
+
         Args:
-            query_vector: 1536-dimensional embedding
-            query_text: Search query text
-            top: Number of results
-            domain_filter: Optional domain filter (e.g., "IAM")
-        
+            query_vector:     1536-dim embedding of the SOW chunk.
+            query_text:       Raw text for BM25 matching.
+            top:              Number of questions to return.
+            category_filter:  Optional OData filter on category field.
+
         Returns:
-            Search results dict
+            {"results": [...], "total_count": int}
         """
-        filter_query = f"domain eq '{domain_filter}'" if domain_filter else None
-        return self.search_hybrid(
-            query_vector=query_vector,
-            query_text=query_text,
-            index_type="caiq",
-            top=top,
-            filter_query=filter_query,
-        )
-    
-    def search_customer_docs_hybrid(
-        self,
-        customer_id: str,
-        query_vector: List[float],
-        query_text: str,
-        top: int = 50,
-    ) -> Dict[str, Any]:
-        """
-        Convenience method for searching customer documents.
-        
-        Args:
-            customer_id: Customer identifier
-            query_vector: 1536-dimensional embedding
-            query_text: Search query text
-            top: Number of results
-        
-        Returns:
-            Search results dict
-        """
-        filter_query = f"customer_id eq '{customer_id}'"
-        return self.search_hybrid(
-            query_vector=query_vector,
-            query_text=query_text,
-            index_type="customer_docs",
-            customer_id=customer_id,
-            top=top,
-            filter_query=filter_query,
-        )
-    
+        try:
+            client = self._get_questions_client()
+            vector_query = VectorizedQuery(
+                vector=query_vector,
+                k_nearest_neighbors=50,
+                fields="vector",
+            )
+            params: Dict[str, Any] = {
+                "vector_queries": [vector_query],
+                "search_text": query_text,
+                "select": ["id", "question_id", "category", "question_text"],
+                "top": top,
+            }
+            if category_filter:
+                params["filter"] = f"category eq '{category_filter}'"
+
+            parsed = []
+            for r in client.search(**params):
+                parsed.append({
+                    "id": r.get("id"),
+                    "question_id": r.get("question_id"),
+                    "category": r.get("category"),
+                    "question_text": r.get("question_text"),
+                    "score": r.get("@search.score"),
+                })
+            return {"results": parsed, "total_count": len(parsed)}
+        except Exception as e:
+            logger.error(f"Questions hybrid search error: {e}")
+            raise
+
     def delete_customer_index(self, customer_id: str) -> bool:
         """
         Delete a customer's document index (cleanup when customer data expires).

@@ -19,7 +19,7 @@ from typing import List, Dict, Optional
 
 from app.core.azure_search import AzureSearchClient
 from app.core.embedder import embed_texts
-from app.core.ingestor import load_caiq_questions
+from app.core.ingestor import load_caiq_questions, load_sop_file, load_questions_xlsx
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +27,15 @@ logger = logging.getLogger(__name__)
 # Configuration
 # JSON file mapping question_id → full question dict (for result enrichment)
 QUESTIONS_STORE_PATH = "data/questions_store.json"
+SOP_STORE_PATH = "data/sop_store.json"
+CUSTOM_QUESTIONS_STORE_PATH = "data/custom_questions_store.json"
 
 # Azure Search configuration (loaded from environment)
 AZURE_SEARCH_ENDPOINT = os.getenv("AZURE_SEARCH_ENDPOINT")
 AZURE_SEARCH_API_KEY = os.getenv("AZURE_SEARCH_API_KEY")
 AZURE_SEARCH_CAIQ_INDEX_NAME = os.getenv("AZURE_SEARCH_CAIQ_INDEX_NAME", "caiq_questions")
+AZURE_SEARCH_SOP_INDEX_NAME = os.getenv("AZURE_SEARCH_SOP_INDEX_NAME", "sop_chunks")
+AZURE_SEARCH_QUESTIONS_INDEX_NAME = os.getenv("AZURE_SEARCH_QUESTIONS_INDEX_NAME", "custom_questions")
 
 
 def sanitize_azure_key(key: str) -> str:
@@ -147,13 +151,155 @@ def build_index(xlsx_path: str) -> int:
 # Index loaders (called at query time)
 # ---------------------------------------------------------------------------
 
+def build_sop_index(sop_files: List[tuple]) -> int:
+    """
+    Parse, embed, and index SOP files into the SOP chunks Azure index.
+
+    Args:
+        sop_files: list of (file_path, capability) tuples.
+
+    Returns:
+        Number of chunks successfully indexed.
+    """
+    if not AZURE_SEARCH_ENDPOINT or not AZURE_SEARCH_API_KEY:
+        raise ValueError(
+            "Azure Cognitive Search credentials not found. "
+            "Set AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_API_KEY in .env"
+        )
+
+    # Step 1 — Parse all SOP files into chunks
+    logger.info(f"Parsing {len(sop_files)} SOP file(s)...")
+    all_chunks: List[Dict] = []
+    for file_path, capability in sop_files:
+        chunks = load_sop_file(file_path, capability)
+        all_chunks.extend(chunks)
+        logger.info(f"  {file_path} → {len(chunks)} chunks (capability: {capability})")
+
+    if not all_chunks:
+        logger.warning("No SOP chunks produced — nothing to index")
+        return 0
+
+    # Step 2 — Batch embed all chunks
+    logger.info(f"Embedding {len(all_chunks)} SOP chunks...")
+    texts = [c["chunk_text"] for c in all_chunks]
+    embeddings = embed_texts(texts)
+
+    # Step 3 — Build Azure documents
+    documents = []
+    for i, chunk in enumerate(all_chunks):
+        doc_id = sanitize_azure_key(chunk["chunk_id"])
+        documents.append({
+            "id": doc_id,
+            "chunk_id": chunk["chunk_id"],
+            "filename": chunk["filename"],
+            "capability": chunk["capability"],
+            "chunk_text": chunk["chunk_text"],
+            "chunk_index": chunk["chunk_index"],
+            "vector": embeddings[i],
+        })
+
+    # Step 4 — Upload to Azure
+    logger.info(f"Uploading {len(documents)} SOP chunks to Azure Cognitive Search...")
+    client = AzureSearchClient(
+        endpoint=AZURE_SEARCH_ENDPOINT,
+        api_key=AZURE_SEARCH_API_KEY,
+        caiq_index_name=AZURE_SEARCH_CAIQ_INDEX_NAME,
+        sop_index_name=AZURE_SEARCH_SOP_INDEX_NAME,
+        questions_index_name=AZURE_SEARCH_QUESTIONS_INDEX_NAME,
+    )
+    result = client.index_sop_chunks(documents)
+    succeeded = result.get("succeeded", 0)
+    failed = result.get("failed", 0)
+    if failed:
+        logger.warning(f"  {failed} SOP chunks failed to index")
+
+    # Step 5 — Cache SOP chunk metadata locally
+    logger.info(f"Caching SOP chunk metadata to {SOP_STORE_PATH}...")
+    Path(SOP_STORE_PATH).parent.mkdir(parents=True, exist_ok=True)
+    sop_store = {c["chunk_id"]: c for c in all_chunks}
+    with open(SOP_STORE_PATH, "w") as f:
+        json.dump(sop_store, f, indent=2)
+
+    logger.info(f"  Successfully indexed {succeeded} SOP chunks")
+    return succeeded
+
+
+def build_questions_index(xlsx_path: str) -> int:
+    """
+    Parse, embed, and index a questions Excel file into the custom questions Azure index.
+
+    Expected Excel columns: 'category' and 'question' (case-insensitive header detection).
+
+    Args:
+        xlsx_path: path to the questions Excel file.
+
+    Returns:
+        Number of questions successfully indexed.
+    """
+    if not AZURE_SEARCH_ENDPOINT or not AZURE_SEARCH_API_KEY:
+        raise ValueError(
+            "Azure Cognitive Search credentials not found. "
+            "Set AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_API_KEY in .env"
+        )
+
+    # Step 1 — Parse questions
+    logger.info("Parsing questions from Excel...")
+    questions = load_questions_xlsx(xlsx_path)
+    logger.info(f"  Found {len(questions)} questions")
+
+    if not questions:
+        raise ValueError("No questions found in the uploaded Excel file. "
+                         "Ensure it has 'category' and 'question' columns.")
+
+    # Step 2 — Batch embed
+    logger.info("Embedding questions...")
+    texts = [q["question_text"] for q in questions]
+    embeddings = embed_texts(texts)
+
+    # Step 3 — Build Azure documents
+    documents = []
+    for i, q in enumerate(questions):
+        doc_id = sanitize_azure_key(q["question_id"])
+        documents.append({
+            "id": doc_id,
+            "question_id": q["question_id"],
+            "category": q["category"],
+            "question_text": q["question_text"],
+            "vector": embeddings[i],
+        })
+
+    # Step 4 — Upload to Azure
+    logger.info(f"Uploading {len(documents)} questions to Azure Cognitive Search...")
+    client = AzureSearchClient(
+        endpoint=AZURE_SEARCH_ENDPOINT,
+        api_key=AZURE_SEARCH_API_KEY,
+        caiq_index_name=AZURE_SEARCH_CAIQ_INDEX_NAME,
+        sop_index_name=AZURE_SEARCH_SOP_INDEX_NAME,
+        questions_index_name=AZURE_SEARCH_QUESTIONS_INDEX_NAME,
+    )
+    result = client.index_questions(documents)
+    succeeded = result.get("succeeded", 0)
+    failed = result.get("failed", 0)
+    if failed:
+        logger.warning(f"  {failed} questions failed to index")
+
+    # Step 5 — Cache question metadata locally
+    logger.info(f"Caching question metadata to {CUSTOM_QUESTIONS_STORE_PATH}...")
+    Path(CUSTOM_QUESTIONS_STORE_PATH).parent.mkdir(parents=True, exist_ok=True)
+    with open(CUSTOM_QUESTIONS_STORE_PATH, "w") as f:
+        json.dump({q["question_id"]: q for q in questions}, f, indent=2)
+
+    logger.info(f"  Successfully indexed {succeeded} questions")
+    return succeeded
+
+
 def get_azure_search_client() -> AzureSearchClient:
     """
-    Get initialized Azure Cognitive Search client.
-    
+    Get initialized Azure Cognitive Search client (all indexes configured).
+
     Returns:
         AzureSearchClient instance configured from environment variables.
-    
+
     Raises:
         ValueError if credentials are not available.
     """
@@ -162,11 +308,13 @@ def get_azure_search_client() -> AzureSearchClient:
             "Azure Cognitive Search credentials not found. "
             "Set AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_API_KEY in .env"
         )
-    
+
     return AzureSearchClient(
         endpoint=AZURE_SEARCH_ENDPOINT,
         api_key=AZURE_SEARCH_API_KEY,
-        caiq_index_name=AZURE_SEARCH_CAIQ_INDEX_NAME
+        caiq_index_name=AZURE_SEARCH_CAIQ_INDEX_NAME,
+        sop_index_name=AZURE_SEARCH_SOP_INDEX_NAME,
+        questions_index_name=AZURE_SEARCH_QUESTIONS_INDEX_NAME,
     )
 
 
@@ -203,26 +351,61 @@ def load_questions_store() -> Dict:
     """
     if not os.path.exists(QUESTIONS_STORE_PATH):
         raise FileNotFoundError(f"Questions store not found at {QUESTIONS_STORE_PATH}")
-    
+
     with open(QUESTIONS_STORE_PATH, "r") as f:
+        return json.load(f)
+
+
+def load_custom_questions_store() -> Dict:
+    """
+    Load the custom questions metadata store from disk (new flow).
+
+    Returns:
+        Dict mapping question_id (str) → {question_id, category, question_text}.
+    """
+    if not os.path.exists(CUSTOM_QUESTIONS_STORE_PATH):
+        raise FileNotFoundError(
+            f"Custom questions store not found at {CUSTOM_QUESTIONS_STORE_PATH}. "
+            "Upload and index a questions Excel file first."
+        )
+
+    with open(CUSTOM_QUESTIONS_STORE_PATH, "r") as f:
         return json.load(f)
 
 
 def index_is_built() -> bool:
     """
-    Check whether the CAIQ index is built in Azure Cognitive Search.
+    Check whether the CAIQ index is built in Azure Cognitive Search (legacy).
 
-    Used by the API to guard /query calls before /index has been run.
-    
     Returns:
         True if questions_store.json exists and Azure CS is reachable.
     """
     if not os.path.exists(QUESTIONS_STORE_PATH):
         return False
-    
+
     try:
         client = get_azure_search_client()
         return client.health_check()
     except Exception as e:
         logger.warning(f"Index health check failed: {str(e)}")
         return False
+
+
+def sop_index_is_built() -> bool:
+    """
+    Check whether the SOP chunks index has been built.
+
+    Returns:
+        True if sop_store.json exists on disk.
+    """
+    return os.path.exists(SOP_STORE_PATH)
+
+
+def questions_index_is_built() -> bool:
+    """
+    Check whether the custom questions index has been built.
+
+    Returns:
+        True if custom_questions_store.json exists on disk.
+    """
+    return os.path.exists(CUSTOM_QUESTIONS_STORE_PATH)

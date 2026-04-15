@@ -25,7 +25,7 @@
     header h1 { font-size: 1.3rem; font-weight: 600; }
     header span { font-size: 0.85rem; opacity: 0.7; margin-left: auto; }
 
-    .container { max-width: 960px; margin: 32px auto; padding: 0 20px; }
+    .container { max-width: 980px; margin: 32px auto; padding: 0 20px; }
 
     /* Step label */
     .step-label {
@@ -53,82 +53,95 @@
     }
     .card.dimmed { opacity: 0.5; pointer-events: none; }
 
-    /* Index status banner */
-    #index-status-banner {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 14px; border-radius: 7px;
-      font-size: 0.87rem; font-weight: 500;
-      margin-bottom: 18px;
+    /* Section divider within card */
+    .section-divider {
+      border: none; border-top: 1px solid #e8ecf2;
+      margin: 22px 0;
     }
-    #index-status-banner.ready   { background: #eef7ee; color: #2e7d32; border: 1px solid #a8d5a2; }
-    #index-status-banner.missing { background: #fff8e1; color: #e65100; border: 1px solid #ffcc80; }
-    #index-status-banner.loading { background: #f0f3f8; color: #555;    border: 1px solid #d0d7e3; }
+    .section-title {
+      font-size: 0.85rem; font-weight: 600; color: #0f3460;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      margin-bottom: 12px;
+    }
+
+    /* Status badge row */
+    .status-badges { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 20px;
+      font-size: 0.8rem; font-weight: 500;
+    }
+    .badge.ready   { background: #eef7ee; color: #2e7d32; border: 1px solid #a8d5a2; }
+    .badge.missing { background: #fff8e1; color: #e65100; border: 1px solid #ffcc80; }
+    .badge.loading { background: #f0f3f8; color: #777;    border: 1px solid #d0d7e3; }
+    .badge .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .badge.ready .dot   { background: #2e7d32; }
+    .badge.missing .dot { background: #e65100; }
+    .badge.loading .dot { background: #b0b8c9; }
 
     /* Drop zone */
     .drop-zone {
       border: 2px dashed #c5cfe0;
       border-radius: 8px;
-      padding: 28px 20px;
+      padding: 22px 18px;
       text-align: center;
       cursor: pointer;
       transition: border-color 0.2s, background 0.2s;
       background: #f8fafd;
     }
     .drop-zone.dragover { border-color: #0f3460; background: #eef2fa; }
-    .drop-zone svg { opacity: 0.4; margin-bottom: 8px; }
-    .drop-zone p { color: #666; font-size: 0.9rem; }
+    .drop-zone svg { opacity: 0.4; margin-bottom: 7px; }
+    .drop-zone p { color: #666; font-size: 0.88rem; }
     .drop-zone strong { color: #0f3460; cursor: pointer; }
     .drop-zone strong:hover { text-decoration: underline; }
-    .drop-zone .hint { margin-top: 5px; font-size: 0.76rem; color: #aaa; }
+    .drop-zone .hint { margin-top: 4px; font-size: 0.75rem; color: #aaa; }
 
-    /* File chips */
-    .file-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    /* File chips with capability input */
+    .file-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .file-row {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
     .file-chip {
       display: flex; align-items: center; gap: 6px;
       background: #eef2fa; border-radius: 20px;
       padding: 4px 12px; font-size: 0.82rem; color: #0f3460;
+      flex-shrink: 0;
     }
     .file-chip button {
       background: none; border: none; cursor: pointer;
       font-size: 1rem; line-height: 1; color: #888; padding: 0;
     }
     .file-chip button:hover { color: #c0392b; }
+    .capability-input {
+      padding: 4px 10px; border: 1px solid #d0d7e3; border-radius: 6px;
+      font-size: 0.82rem; color: #333; width: 200px;
+      outline: none;
+    }
+    .capability-input:focus { border-color: #0f3460; }
+    .capability-label { font-size: 0.78rem; color: #888; flex-shrink: 0; }
 
     /* Options row */
     .options { display: flex; gap: 24px; align-items: flex-end; margin-top: 18px; flex-wrap: wrap; }
     .field { display: flex; flex-direction: column; gap: 5px; }
     .field label { font-size: 0.8rem; font-weight: 500; color: #555; }
     .field input[type="number"] {
-      width: 80px; padding: 7px 10px;
+      width: 90px; padding: 7px 10px;
       border: 1px solid #d0d7e3; border-radius: 6px; font-size: 0.9rem;
     }
-    .toggle-wrap { display: flex; align-items: center; gap: 8px; }
-    .toggle {
-      position: relative; width: 40px; height: 22px;
-      background: #c5cfe0; border-radius: 20px; cursor: pointer;
-      transition: background 0.2s;
-    }
-    .toggle.on { background: #0f3460; }
-    .toggle::after {
-      content: ""; position: absolute; top: 3px; left: 3px;
-      width: 16px; height: 16px; border-radius: 50%;
-      background: white; transition: left 0.2s;
-    }
-    .toggle.on::after { left: 21px; }
-    .toggle-label { font-size: 0.82rem; color: #555; font-weight: 500; }
 
     /* Buttons */
     .btn {
-      padding: 9px 24px; border: none; border-radius: 7px;
-      font-size: 0.92rem; font-weight: 600; cursor: pointer;
+      padding: 9px 22px; border: none; border-radius: 7px;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer;
       transition: background 0.2s;
     }
     .btn-primary { background: #0f3460; color: white; }
     .btn-primary:hover:not(:disabled) { background: #16213e; }
     .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
-    .btn-warning { background: #e65100; color: white; margin-top: 18px; }
+    .btn-warning { background: #e65100; color: white; margin-top: 16px; }
     .btn-warning:hover:not(:disabled) { background: #bf360c; }
     .btn-warning:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-sm { padding: 6px 14px; font-size: 0.82rem; }
 
     /* Status row */
     .status-row {
@@ -149,49 +162,15 @@
       color: #c0392b; margin-top: 12px;
     }
 
-    /* Confirm overlay */
-    #confirm-overlay {
-      display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,0.45); z-index: 100;
-      align-items: center; justify-content: center;
-    }
-    #confirm-overlay.show { display: flex; }
-    .confirm-box {
-      background: white; border-radius: 10px; padding: 28px 32px;
-      max-width: 420px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-    }
-    .confirm-box h3 { font-size: 1rem; font-weight: 600; margin-bottom: 10px; }
-    .confirm-box p { font-size: 0.88rem; color: #555; line-height: 1.5; margin-bottom: 20px; }
-    .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
-    .btn-cancel {
-      padding: 8px 20px; border: 1px solid #d0d7e3; border-radius: 7px;
-      background: white; font-size: 0.88rem; cursor: pointer;
-    }
-    .btn-cancel:hover { background: #f4f6f9; }
-    .btn-confirm {
-      padding: 8px 20px; border: none; border-radius: 7px;
-      background: #e65100; color: white; font-size: 0.88rem;
-      font-weight: 600; cursor: pointer;
-    }
-    .btn-confirm:hover { background: #bf360c; }
-
-    /* Summary */
-    #summary-box {
-      display: none; background: #eef7ee; border: 1px solid #a8d5a2;
-      border-radius: 7px; padding: 14px 18px; margin-bottom: 20px;
-    }
-    #summary-box h3 { font-size: 0.85rem; font-weight: 600; color: #2e7d32; margin-bottom: 5px; }
-    #summary-box p  { font-size: 0.85rem; color: #2e7d32; line-height: 1.5; }
-
     /* Results */
     #results-card { display: none; }
     #results-header {
-      display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
     }
     #results-header h2 { font-size: 1rem; font-weight: 600; color: #0f3460; }
     #results-count { font-size: 0.82rem; color: #888; }
 
-    table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     thead th {
       text-align: left; padding: 10px 12px;
       background: #f0f3f8; color: #555; font-weight: 600;
@@ -200,17 +179,33 @@
     tbody tr { border-bottom: 1px solid #eef0f5; }
     tbody tr:hover { background: #f8fafd; }
     tbody td { padding: 10px 12px; vertical-align: top; }
-    td.rank { font-weight: 700; color: #0f3460; width: 36px; text-align: center; }
-    td.question { line-height: 1.5; max-width: 460px; }
-    .domain-badge {
+    td.rank { font-weight: 700; color: #0f3460; width: 34px; text-align: center; }
+    td.question-text { line-height: 1.5; max-width: 380px; }
+    td.context-cell { max-width: 240px; }
+    .category-badge {
       display: inline-block; padding: 2px 9px; border-radius: 12px;
-      font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+      font-size: 0.74rem; font-weight: 600; white-space: nowrap;
       background: #e3ecf9; color: #0f3460;
     }
-    .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .score-bar-wrap { display: flex; align-items: center; gap: 8px; min-width: 80px; }
     .score-bar { flex: 1; height: 6px; background: #e0e6f0; border-radius: 3px; overflow: hidden; }
     .score-bar-fill { height: 100%; background: #0f3460; border-radius: 3px; }
-    .score-val { font-size: 0.78rem; color: #888; min-width: 38px; }
+    .score-val { font-size: 0.76rem; color: #888; }
+
+    /* Context cell styles */
+    .context-block { font-size: 0.78rem; line-height: 1.5; color: #555; }
+    .context-path {
+      display: inline-block; padding: 1px 8px; border-radius: 10px;
+      font-size: 0.72rem; font-weight: 600; margin-bottom: 4px;
+    }
+    .context-path.direct { background: #e3f2fd; color: #1565c0; }
+    .context-path.via-sop { background: #f3e5f5; color: #6a1b9a; }
+    .context-snippet {
+      display: block; color: #777; font-style: italic;
+      overflow: hidden; display: -webkit-box;
+      -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .context-file { font-size: 0.72rem; color: #999; margin-top: 3px; }
   </style>
 </head>
 <body>
@@ -223,66 +218,110 @@
     <line x1="16" y1="17" x2="8" y2="17"/>
   </svg>
   <h1>QuestionaireRAG</h1>
-  <span>Security Questionnaire Recommender</span>
+  <span>SOW-Based Security Question Recommender</span>
 </header>
 
 <div class="container">
 
-  <!-- ── STEP 1: Index Questionnaire ── -->
+  <!-- ── Index Status Badges ── -->
+  <div class="status-badges" id="status-badges">
+    <div class="badge loading" id="badge-sop">
+      <span class="dot"></span><span id="badge-sop-text">Checking SOP index...</span>
+    </div>
+    <div class="badge loading" id="badge-q">
+      <span class="dot"></span><span id="badge-q-text">Checking questions index...</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       STEP 1 — Setup: Index SOPs + Questions
+  ══════════════════════════════════════════════ -->
   <div class="step-label">
     <div class="step-num" id="step1-num">1</div>
-    <h2>Index Security Questionnaire</h2>
+    <h2>Setup — Index SOPs &amp; Questions</h2>
   </div>
 
   <div class="card" id="step1-card">
-    <div id="index-status-banner" class="loading">
-      <span id="index-status-text">Checking index status...</span>
+
+    <!-- Sub-section A: SOPs -->
+    <p class="section-title">A &nbsp;·&nbsp; Standard Operating Procedures (SOPs)</p>
+
+    <input type="file" id="sop-file-input" multiple accept=".docx,.pdf,.xlsx" style="display:none" />
+    <div class="drop-zone" id="sop-drop-zone" onclick="document.getElementById('sop-file-input').click()">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0f3460" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+      </svg>
+      <p>Drag &amp; drop SOP files, or <strong>browse</strong></p>
+      <p class="hint">.docx · .pdf · .xlsx &nbsp;·&nbsp; multiple files allowed</p>
     </div>
+
+    <div class="file-list" id="sop-file-list"></div>
+
+    <button class="btn btn-primary btn-sm" id="index-sop-btn" disabled onclick="indexSops()" style="margin-top:14px">
+      Index SOPs
+    </button>
+    <div class="status-row" id="sop-status-row">
+      <div class="spinner"></div>
+      <span id="sop-status-msg">Chunking and embedding SOP files...</span>
+    </div>
+    <div class="error-box" id="sop-error"></div>
+
+    <hr class="section-divider" />
+
+    <!-- Sub-section B: Questions -->
+    <p class="section-title">B &nbsp;·&nbsp; Questions Excel</p>
 
     <input type="file" id="q-file-input" accept=".xlsx" style="display:none" />
     <div class="drop-zone" id="q-drop-zone" onclick="document.getElementById('q-file-input').click()">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0f3460" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0f3460" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
         <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
       </svg>
-      <p>Drag &amp; drop your CAIQ XLSX, or <strong>browse</strong></p>
-      <p class="hint">Only .xlsx files accepted</p>
+      <p>Drag &amp; drop your questions XLSX, or <strong>browse</strong></p>
+      <p class="hint">Must have <em>category</em> and <em>question</em> columns</p>
     </div>
+
     <div class="file-list" id="q-file-list"></div>
 
-    <button class="btn btn-warning" id="index-btn" disabled onclick="confirmIndex()">
-      Index Questionnaire
+    <button class="btn btn-warning btn-sm" id="index-q-btn" disabled onclick="indexQuestions()">
+      Index Questions
     </button>
-
-    <div class="status-row" id="index-status-row">
+    <div class="status-row" id="q-status-row">
       <div class="spinner"></div>
-      <span id="index-status-msg">Generating embeddings and indexing...</span>
+      <span id="q-status-msg">Generating embeddings and indexing questions...</span>
     </div>
-    <div class="error-box" id="index-error"></div>
-  </div>
+    <div class="error-box" id="q-error"></div>
 
-  <!-- ── STEP 2: Upload Customer Docs ── -->
+  </div><!-- /step1-card -->
+
+
+  <!-- ══════════════════════════════════════════════
+       STEP 2 — Query with SOWs
+  ══════════════════════════════════════════════ -->
   <div class="step-label">
     <div class="step-num dim" id="step2-num">2</div>
-    <h2>Upload Customer Documents</h2>
+    <h2>Query — Upload SOWs &amp; Find Questions</h2>
   </div>
 
   <div class="card dimmed" id="step2-card">
-    <input type="file" id="c-file-input" multiple accept=".pdf,.xlsx" style="display:none" />
-    <div class="drop-zone" id="c-drop-zone" onclick="document.getElementById('c-file-input').click()">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0f3460" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+
+    <input type="file" id="sow-file-input" multiple accept=".docx,.pdf,.xlsx" style="display:none" />
+    <div class="drop-zone" id="sow-drop-zone" onclick="document.getElementById('sow-file-input').click()">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0f3460" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
         <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
       </svg>
-      <p>Drag &amp; drop customer SOPs / SOWs, or <strong>browse</strong></p>
-      <p class="hint">PDF and XLSX files supported &nbsp;·&nbsp; multiple files allowed</p>
+      <p>Drag &amp; drop Statement of Work (SOW) files, or <strong>browse</strong></p>
+      <p class="hint">.docx · .pdf · .xlsx &nbsp;·&nbsp; multiple SOWs allowed</p>
     </div>
-    <div class="file-list" id="c-file-list"></div>
+
+    <div class="file-list" id="sow-file-list"></div>
 
     <div class="options">
       <div class="field">
-        <label for="top-k">Top K results</label>
-        <input type="number" id="top-k" value="20" min="1" max="263" />
+        <label for="top-n">Top N questions</label>
+        <input type="number" id="top-n" value="20" min="1" max="500" />
       </div>
     </div>
 
@@ -292,20 +331,19 @@
 
     <div class="status-row" id="query-status-row">
       <div class="spinner"></div>
-      <span id="query-status-msg">Processing documents...</span>
+      <span id="query-status-msg">Processing SOW documents...</span>
     </div>
     <div class="error-box" id="query-error"></div>
-  </div>
 
-  <!-- Results -->
-  <div id="summary-box">
-    <h3>Context Summary</h3>
-    <p id="summary-text"></p>
-  </div>
+  </div><!-- /step2-card -->
 
+
+  <!-- ══════════════════════════════════════════════
+       Results
+  ══════════════════════════════════════════════ -->
   <div class="card" id="results-card">
     <div id="results-header">
-      <h2>Recommended CAIQ Questions</h2>
+      <h2>Recommended Questions</h2>
       <span id="results-count"></span>
     </div>
     <table>
@@ -313,247 +351,360 @@
         <tr>
           <th>#</th>
           <th>Question ID</th>
-          <th>Domain</th>
+          <th>Category</th>
           <th>Question</th>
           <th>Score</th>
+          <th>Supporting Context</th>
         </tr>
       </thead>
       <tbody id="results-body"></tbody>
     </table>
   </div>
 
-</div>
+</div><!-- /container -->
 
-<!-- Confirm re-index dialog -->
-<div id="confirm-overlay">
-  <div class="confirm-box">
-    <h3>Re-index questionnaire?</h3>
-    <p>This will replace the current index with fresh embeddings from the uploaded file. The process takes a few minutes. Are you sure?</p>
-    <div class="confirm-actions">
-      <button class="btn-cancel" onclick="closeConfirm()">Cancel</button>
-      <button class="btn-confirm" onclick="runIndex()">Yes, Index Now</button>
-    </div>
-  </div>
-</div>
 
 <script>
-  // ── State ──
-  let qFile = null;
-  let customerFiles = [];
-  let indexIsReady = false;
+// ── State ──────────────────────────────────────────────────────────────────
+let sopFiles = [];      // [{file, capability}]
+let qFile = null;
+let sowFiles = [];
 
-  // ── On load: check index status ──
-  window.addEventListener('DOMContentLoaded', checkIndexStatus);
+let sopIndexReady = false;
+let qIndexReady   = false;
 
-  async function checkIndexStatus() {
-    try {
-      const res = await fetch('/health');
-      const data = await res.json();
-      setIndexReady(data.index_built, data.questions_indexed || 0);
-    } catch {
-      setBanner('loading', 'Could not reach server');
+// ── Boot ───────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  checkStatus();
+  setupDrop('sop-drop-zone', 'sop-file-input', ['.docx','.pdf','.xlsx'], onSopFiles, true);
+  setupDrop('q-drop-zone',   'q-file-input',   ['.xlsx'],                onQFile,   false);
+  setupDrop('sow-drop-zone', 'sow-file-input', ['.docx','.pdf','.xlsx'], onSowFiles, true);
+});
+
+async function checkStatus() {
+  try {
+    const data = await fetchJSON('/health');
+    sopIndexReady = data.sop_index_built || false;
+    qIndexReady   = data.questions_index_built || false;
+    updateBadge('badge-sop', sopIndexReady,
+      `SOPs indexed — ${data.sop_chunks_indexed || 0} chunks`,
+      'SOP index not built');
+    updateBadge('badge-q', qIndexReady,
+      `Questions indexed — ${data.custom_questions_indexed || 0} questions`,
+      'Questions index not built');
+    updateStep2();
+  } catch {
+    updateBadge('badge-sop', false, '', 'Could not reach server');
+    updateBadge('badge-q',   false, '', 'Could not reach server');
+  }
+}
+
+function updateBadge(id, ready, readyText, missingText) {
+  const el = document.getElementById(id);
+  const textEl = el.querySelector('span:last-child');
+  el.className = 'badge ' + (ready ? 'ready' : 'missing');
+  textEl.textContent = ready ? readyText : missingText;
+}
+
+function updateStep2() {
+  const ready = qIndexReady;  // SOPs are optional — queries work without them
+  const card = document.getElementById('step2-card');
+  const num  = document.getElementById('step2-num');
+  if (ready) {
+    card.classList.remove('dimmed');
+    num.classList.remove('dim');
+    num.classList.add('done');
+  } else {
+    card.classList.add('dimmed');
+    num.classList.add('dim');
+    num.classList.remove('done');
+  }
+}
+
+// ── SOP files ──────────────────────────────────────────────────────────────
+function onSopFiles(files) {
+  files.forEach(f => {
+    if (!sopFiles.find(x => x.file.name === f.name)) {
+      sopFiles.push({ file: f, capability: '' });
     }
-  }
+  });
+  renderSopList();
+  document.getElementById('index-sop-btn').disabled = sopFiles.length === 0;
+}
 
-  function setIndexReady(ready, count) {
-    indexIsReady = ready;
-    if (ready) {
-      setBanner('ready', `Index ready — ${count.toLocaleString()} questions indexed`);
-      document.getElementById('step1-num').classList.add('done');
-      document.getElementById('step1-num').classList.remove('dim');
-      document.getElementById('step2-num').classList.remove('dim');
-      document.getElementById('step2-card').classList.remove('dimmed');
-    } else {
-      setBanner('missing', 'No index found — upload a questionnaire to get started');
-      document.getElementById('step2-card').classList.add('dimmed');
-      document.getElementById('step2-num').classList.add('dim');
-    }
-  }
+function removeSopFile(name) {
+  sopFiles = sopFiles.filter(x => x.file.name !== name);
+  renderSopList();
+  document.getElementById('index-sop-btn').disabled = sopFiles.length === 0;
+}
 
-  function setBanner(type, text) {
-    const b = document.getElementById('index-status-banner');
-    b.className = 'loading';
-    b.classList.add(type === 'ready' ? 'ready' : type === 'missing' ? 'missing' : 'loading');
-    document.getElementById('index-status-text').textContent = text;
-  }
-
-  // ── Questionnaire upload ──
-  setupDrop('q-drop-zone', 'q-file-input', ['.xlsx'], (files) => {
-    qFile = files[0] || null;
-    renderChips('q-file-list', qFile ? [qFile] : [], () => { qFile = null; renderChips('q-file-list', [], null); document.getElementById('index-btn').disabled = true; });
-    document.getElementById('index-btn').disabled = !qFile;
-  }, false);
-
-  function confirmIndex() {
-    if (!qFile) return;
-    if (indexIsReady) {
-      document.getElementById('confirm-overlay').classList.add('show');
-    } else {
-      runIndex();
-    }
-  }
-  function closeConfirm() {
-    document.getElementById('confirm-overlay').classList.remove('show');
-  }
-
-  async function runIndex() {
-    closeConfirm();
-    if (!qFile) return;
-
-    setIndexLoading(true);
-    document.getElementById('index-error').style.display = 'none';
-
-    const fd = new FormData();
-    fd.append('file', qFile);
-
-    try {
-      const res = await fetch('/index/upload-questionnaire', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`);
-      setIndexReady(true, data.questions_indexed);
-    } catch (err) {
-      document.getElementById('index-error').textContent = 'Error: ' + err.message;
-      document.getElementById('index-error').style.display = 'block';
-    } finally {
-      setIndexLoading(false);
-    }
-  }
-
-  function setIndexLoading(on) {
-    document.getElementById('index-btn').disabled = on;
-    document.getElementById('index-status-row').style.display = on ? 'flex' : 'none';
-    if (on) {
-      const steps = ['Parsing XLSX...', 'Generating embeddings (this takes a few minutes)...', 'Uploading to Azure Cognitive Search...', 'Almost done...'];
-      let i = 0;
-      window._idxInterval = setInterval(() => {
-        document.getElementById('index-status-msg').textContent = steps[i++ % steps.length];
-      }, 3000);
-    } else {
-      clearInterval(window._idxInterval);
-      if (qFile) document.getElementById('index-btn').disabled = false;
-    }
-  }
-
-  // ── Customer doc upload ──
-  setupDrop('c-drop-zone', 'c-file-input', ['.pdf', '.xlsx'], (files) => {
-    files.forEach(f => { if (!customerFiles.find(x => x.name === f.name)) customerFiles.push(f); });
-    renderChips('c-file-list', customerFiles, (name) => {
-      customerFiles = customerFiles.filter(f => f.name !== name);
-      renderChips('c-file-list', customerFiles, arguments.callee);
-      document.getElementById('query-btn').disabled = customerFiles.length === 0;
-    });
-    document.getElementById('query-btn').disabled = customerFiles.length === 0;
-  }, true);
-
-  async function submitQuery() {
-    if (!customerFiles.length) return;
-    setQueryLoading(true);
-    clearResults();
-
-    const fd = new FormData();
-    customerFiles.forEach(f => fd.append('files', f));
-    fd.append('top_k', document.getElementById('top-k').value);
-
-    try {
-      const res = await fetch('/upload-and-query', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`);
-      renderResults(data);
-    } catch (err) {
-      document.getElementById('query-error').textContent = 'Error: ' + err.message;
-      document.getElementById('query-error').style.display = 'block';
-    } finally {
-      setQueryLoading(false);
-    }
-  }
-
-  function setQueryLoading(on) {
-    document.getElementById('query-btn').disabled = on;
-    document.getElementById('query-status-row').style.display = on ? 'flex' : 'none';
-    if (on) {
-      const steps = ['Extracting text...', 'Summarising with GPT-4o...', 'Running hybrid search...', 'Ranking results...'];
-      let i = 0;
-      window._qInterval = setInterval(() => {
-        document.getElementById('query-status-msg').textContent = steps[i++ % steps.length];
-      }, 2500);
-    } else {
-      clearInterval(window._qInterval);
-      if (customerFiles.length) document.getElementById('query-btn').disabled = false;
-    }
-  }
-
-  function clearResults() {
-    document.getElementById('results-card').style.display = 'none';
-    document.getElementById('summary-box').style.display = 'none';
-    document.getElementById('query-error').style.display = 'none';
-    document.getElementById('results-body').innerHTML = '';
-  }
-
-  function renderResults(data) {
-    document.getElementById('summary-text').textContent = data.context_summary;
-    document.getElementById('summary-box').style.display = 'block';
-
-    const maxScore = Math.max(...data.questions.map(q => q.score), 0.0001);
-    document.getElementById('results-body').innerHTML = data.questions.map(q => {
-      const pct = Math.round((q.score / maxScore) * 100);
-      return `<tr>
-        <td class="rank">${q.rank}</td>
-        <td><code style="font-size:0.82rem">${esc(q.question_id)}</code></td>
-        <td><span class="domain-badge">${esc(q.domain)}</span></td>
-        <td class="question">${esc(q.question)}</td>
-        <td>
-          <div class="score-bar-wrap">
-            <div class="score-bar"><div class="score-bar-fill" style="width:${pct}%"></div></div>
-            <span class="score-val">${q.score.toFixed(3)}</span>
-          </div>
-        </td>
-      </tr>`;
-    }).join('');
-
-    document.getElementById('results-count').textContent = `${data.total_results} questions`;
-    document.getElementById('results-card').style.display = 'block';
-  }
-
-  // ── Helpers ──
-  function esc(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  function renderChips(containerId, files, onRemove) {
-    document.getElementById(containerId).innerHTML = files.map(f => `
+function renderSopList() {
+  const container = document.getElementById('sop-file-list');
+  container.innerHTML = sopFiles.map(({ file }) => `
+    <div class="file-row">
       <div class="file-chip">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-        </svg>
+        ${fileIcon()}
+        ${esc(file.name)}
+        <button onclick="removeSopFile('${esc(file.name)}')" title="Remove">&times;</button>
+      </div>
+      <span class="capability-label">Capability:</span>
+      <input
+        class="capability-input"
+        type="text"
+        placeholder="e.g. Identity &amp; Access Management"
+        id="cap-${esc(file.name)}"
+        value="${esc(sopFiles.find(x => x.file.name === file.name)?.capability || '')}"
+        oninput="setSopCapability('${esc(file.name)}', this.value)"
+      />
+    </div>`).join('');
+}
+
+function setSopCapability(name, value) {
+  const entry = sopFiles.find(x => x.file.name === name);
+  if (entry) entry.capability = value;
+}
+
+async function indexSops() {
+  if (!sopFiles.length) return;
+  // Validate all capabilities filled
+  const missing = sopFiles.filter(x => !x.capability.trim());
+  if (missing.length) {
+    showError('sop-error', `Please enter a capability label for: ${missing.map(x => x.file.name).join(', ')}`);
+    return;
+  }
+
+  setSopLoading(true);
+  hideError('sop-error');
+
+  const fd = new FormData();
+  sopFiles.forEach(({ file, capability }) => {
+    fd.append('files', file);
+    fd.append('capabilities', capability.trim());
+  });
+
+  try {
+    const data = await fetchFormData('/index/upload-sops', fd);
+    sopIndexReady = true;
+    updateBadge('badge-sop', true, `SOPs indexed — ${data.chunks_indexed} chunks`, '');
+    updateStep2();
+  } catch (err) {
+    showError('sop-error', err.message);
+  } finally {
+    setSopLoading(false);
+  }
+}
+
+function setSopLoading(on) {
+  document.getElementById('index-sop-btn').disabled = on;
+  document.getElementById('sop-status-row').style.display = on ? 'flex' : 'none';
+  if (!on && sopFiles.length) document.getElementById('index-sop-btn').disabled = false;
+}
+
+// ── Questions file ─────────────────────────────────────────────────────────
+function onQFile(files) {
+  qFile = files[0] || null;
+  renderChips('q-file-list', qFile ? [qFile] : [], () => {
+    qFile = null;
+    renderChips('q-file-list', [], null);
+    document.getElementById('index-q-btn').disabled = true;
+  });
+  document.getElementById('index-q-btn').disabled = !qFile;
+}
+
+async function indexQuestions() {
+  if (!qFile) return;
+  setQLoading(true);
+  hideError('q-error');
+
+  const fd = new FormData();
+  fd.append('file', qFile);
+
+  try {
+    const data = await fetchFormData('/index/upload-questions', fd);
+    qIndexReady = true;
+    updateBadge('badge-q', true, `Questions indexed — ${data.questions_indexed} questions`, '');
+    updateStep2();
+  } catch (err) {
+    showError('q-error', err.message);
+  } finally {
+    setQLoading(false);
+  }
+}
+
+function setQLoading(on) {
+  document.getElementById('index-q-btn').disabled = on;
+  document.getElementById('q-status-row').style.display = on ? 'flex' : 'none';
+  if (on) {
+    const steps = ['Parsing Excel...', 'Generating embeddings...', 'Uploading to Azure Cognitive Search...', 'Almost done...'];
+    let i = 0;
+    window._qInterval = setInterval(() => {
+      document.getElementById('q-status-msg').textContent = steps[i++ % steps.length];
+    }, 3000);
+  } else {
+    clearInterval(window._qInterval);
+    if (qFile) document.getElementById('index-q-btn').disabled = false;
+  }
+}
+
+// ── SOW files ──────────────────────────────────────────────────────────────
+function onSowFiles(files) {
+  files.forEach(f => { if (!sowFiles.find(x => x.name === f.name)) sowFiles.push(f); });
+  renderChips('sow-file-list', sowFiles, removeSowFile);
+  document.getElementById('query-btn').disabled = sowFiles.length === 0;
+}
+
+function removeSowFile(name) {
+  sowFiles = sowFiles.filter(f => f.name !== name);
+  renderChips('sow-file-list', sowFiles, removeSowFile);
+  document.getElementById('query-btn').disabled = sowFiles.length === 0;
+}
+
+async function submitQuery() {
+  if (!sowFiles.length) return;
+  setQueryLoading(true);
+  clearResults();
+
+  const fd = new FormData();
+  sowFiles.forEach(f => fd.append('files', f));
+  fd.append('top_n', document.getElementById('top-n').value);
+
+  try {
+    const data = await fetchFormData('/query-sow', fd);
+    renderResults(data);
+  } catch (err) {
+    showError('query-error', err.message);
+  } finally {
+    setQueryLoading(false);
+  }
+}
+
+function setQueryLoading(on) {
+  document.getElementById('query-btn').disabled = on;
+  document.getElementById('query-status-row').style.display = on ? 'flex' : 'none';
+  if (on) {
+    const steps = [
+      'Extracting text from SOWs...',
+      'Chunking documents...',
+      'Running hybrid search on SOPs...',
+      'Matching questions...',
+      'Ranking results...',
+    ];
+    let i = 0;
+    window._qryInterval = setInterval(() => {
+      document.getElementById('query-status-msg').textContent = steps[i++ % steps.length];
+    }, 2500);
+  } else {
+    clearInterval(window._qryInterval);
+    if (sowFiles.length) document.getElementById('query-btn').disabled = false;
+  }
+}
+
+// ── Results ────────────────────────────────────────────────────────────────
+function clearResults() {
+  document.getElementById('results-card').style.display = 'none';
+  document.getElementById('results-body').innerHTML = '';
+  hideError('query-error');
+}
+
+function renderResults(data) {
+  const maxScore = Math.max(...data.questions.map(q => q.score), 0.0001);
+
+  document.getElementById('results-body').innerHTML = data.questions.map(q => {
+    const pct = Math.round((q.score / maxScore) * 100);
+    const isDirect = q.match_path === 'Direct SOW match';
+    const pathClass = isDirect ? 'direct' : 'via-sop';
+
+    const contextBlock = `
+      <div class="context-block">
+        <span class="context-path ${pathClass}">${esc(q.match_path)}</span><br/>
+        <span class="context-snippet">${esc(q.sow_context || '')}</span>
+        <span class="context-file">SOW: ${esc(q.sow_filename || '')}</span>
+        ${q.sop_context ? `<span class="context-snippet" style="margin-top:4px">${esc(q.sop_context)}</span>` : ''}
+        ${q.sop_capability ? `<span class="context-file">SOP capability: ${esc(q.sop_capability)}</span>` : ''}
+      </div>`;
+
+    return `<tr>
+      <td class="rank">${q.rank}</td>
+      <td><code style="font-size:0.8rem">${esc(q.question_id)}</code></td>
+      <td><span class="category-badge">${esc(q.category)}</span></td>
+      <td class="question-text">${esc(q.question)}</td>
+      <td>
+        <div class="score-bar-wrap">
+          <div class="score-bar"><div class="score-bar-fill" style="width:${pct}%"></div></div>
+          <span class="score-val">${q.score.toFixed(3)}</span>
+        </div>
+      </td>
+      <td class="context-cell">${contextBlock}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('results-count').textContent = `${data.total_results} questions`;
+  document.getElementById('results-card').style.display = 'block';
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fileIcon() {
+  return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+  </svg>`;
+}
+
+function renderChips(containerId, files, onRemove) {
+  document.getElementById(containerId).innerHTML = files.map(f => `
+    <div class="file-row">
+      <div class="file-chip">
+        ${fileIcon()}
         ${esc(f.name)}
-        ${onRemove ? `<button onclick="removeCustomerFile('${esc(f.name)}')" title="Remove">&times;</button>` : ''}
-      </div>`).join('');
-  }
+        ${onRemove ? `<button onclick="${onRemove.name}('${esc(f.name)}')" title="Remove">&times;</button>` : ''}
+      </div>
+    </div>`).join('');
+}
 
-  function removeCustomerFile(name) {
-    customerFiles = customerFiles.filter(f => f.name !== name);
-    renderChips('c-file-list', customerFiles, removeCustomerFile);
-    document.getElementById('query-btn').disabled = customerFiles.length === 0;
-  }
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = 'Error: ' + msg;
+  el.style.display = 'block';
+}
+function hideError(id) {
+  document.getElementById(id).style.display = 'none';
+}
 
-  function setupDrop(zoneId, inputId, exts, onFiles, multiple) {
-    const zone = document.getElementById(zoneId);
-    const input = document.getElementById(inputId);
-    if (multiple) input.setAttribute('multiple', '');
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`);
+  return data;
+}
 
-    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
-    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
-    zone.addEventListener('drop', e => {
-      e.preventDefault(); zone.classList.remove('dragover');
-      const valid = [...e.dataTransfer.files].filter(f => exts.some(ext => f.name.toLowerCase().endsWith(ext)));
-      if (valid.length) onFiles(valid);
-    });
-    input.addEventListener('change', e => {
-      onFiles([...e.target.files]);
-      e.target.value = '';
-    });
-  }
+async function fetchFormData(url, fd) {
+  const res = await fetch(url, { method: 'POST', body: fd });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`);
+  return data;
+}
+
+function setupDrop(zoneId, inputId, exts, onFiles, multiple) {
+  const zone  = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  if (multiple) input.setAttribute('multiple', '');
+
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    const valid = [...e.dataTransfer.files].filter(f => exts.some(ext => f.name.toLowerCase().endsWith(ext)));
+    if (valid.length) onFiles(valid);
+  });
+  input.addEventListener('change', e => {
+    onFiles([...e.target.files]);
+    e.target.value = '';
+  });
+}
 </script>
 </body>
 </html>

@@ -25,8 +25,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-CAIQ_XLSX_PATH = "data/questionnaires/CAIQv4.0.3_STAR-Security-Questionnaire_Generated-at_2023-09-26.xlsx"
+# v6: Removed hardcoded CAIQ path — questions are now uploaded dynamically via POST /data/upload-questions
 CUSTOMERS_BASE_DIR = "data/customers"
+
+ALLOWED_DOC_EXTENSIONS = {".pdf", ".xlsx", ".docx"}
 
 
 # --- Request / Response models ---
@@ -57,67 +59,60 @@ class QueryResponse(BaseModel):
     questions: List[QuestionResult]
 
 
+# ── New SOW-based models ──────────────────────────────────────────────────────
+
+class SowQuestionResult(BaseModel):
+    rank: int
+    question_id: str
+    category: str
+    question: str
+    score: float = Field(..., description="Hybrid score (direct SOW matches boosted 1.5×)")
+    match_path: str = Field(..., description="'Direct SOW match' or 'SOW → SOP (capability)'")
+    sow_context: str = Field(..., description="First 150 chars of the matching SOW chunk")
+    sow_filename: str
+    sop_context: Optional[str] = Field(None, description="First 150 chars of the matching SOP chunk")
+    sop_capability: Optional[str] = Field(None, description="Capability label of the matched SOP")
+
+
+class SowQueryResponse(BaseModel):
+    total_results: int
+    questions: List[SowQuestionResult]
+
+
 # --- Endpoints ---
 
 @router.get("/health")
 def health():
-    """Quick health check — returns index status and question count."""
+    """Health check — returns status for v6 indexes (SOP chunks, question items, semantic mappings)."""
     import os, json
-    store_path = "data/questions_store.json"
-    if os.path.exists(store_path):
-        with open(store_path) as f:
-            count = len(json.load(f))
-        return {"status": "ok", "index_built": True, "questions_indexed": count}
-    return {"status": "ok", "index_built": False, "questions_indexed": 0}
+
+    # v6: New SOP chunks index
+    sop_built = os.path.exists("data/sop_store.json")
+    sop_chunks = 0
+    if sop_built:
+        with open("data/sop_store.json") as f:
+            sop_chunks = len(json.load(f))
+
+    # v6: Question items index
+    q_built = os.path.exists("data/questions_store.json")
+    q_count = 0
+    if q_built:
+        with open("data/questions_store.json") as f:
+            q_count = len(json.load(f))
+
+    return {
+        "status": "ok",
+        "version": "6.0",
+        "sop_index_built": sop_built,
+        "sop_chunks_indexed": sop_chunks,
+        "questions_index_built": q_built,
+        "custom_questions_indexed": q_count,
+    }
+
+# v6: Legacy /index/questionnaires and /index/upload-questionnaire endpoints removed.
+# Use POST /index/upload-questions instead to upload custom questions Excel files.
 
 
-@router.post("/index/questionnaires", response_model=IndexResponse)
-def index_questionnaires():
-    """Parse CAIQ XLSX and build Azure Cognitive Search index (hybrid: vector + BM25 + semantic ranking)."""
-    from app.core.indexer import build_index  # Lazy import
-    import traceback
-
-    if not Path(CAIQ_XLSX_PATH).exists():
-        raise HTTPException(status_code=404, detail=f"CAIQ file not found at {CAIQ_XLSX_PATH}")
-    try:
-        logger.info("Starting CAIQ indexing to Azure Cognitive Search...")
-        count = build_index(CAIQ_XLSX_PATH)
-        logger.info(f"Successfully indexed {count} questions")
-    except Exception as e:
-        error_details = f"Indexing failed: {str(e)}\n{traceback.format_exc()}"
-        logger.error(error_details)
-        print(f"\n\n=== ERROR IN INDEXING ===\n{error_details}\n=========================\n")
-        raise HTTPException(status_code=500, detail=str(e))
-    return IndexResponse(message="Index built successfully in Azure Cognitive Search", questions_indexed=count)
-
-
-@router.post("/index/upload-questionnaire", response_model=IndexResponse)
-async def upload_and_index_questionnaire(
-    file: UploadFile = File(...),
-):
-    """Upload a CAIQ XLSX file and build the Azure Cognitive Search index with fresh embeddings."""
-    from app.core.indexer import build_index
-    import traceback
-
-    if not file.filename.lower().endswith(".xlsx"):
-        raise HTTPException(status_code=400, detail="Only .xlsx files are accepted for questionnaire indexing.")
-
-    tmp_dir = tempfile.gettempdir()
-    tmp_path = Path(tmp_dir) / f"caiq_upload_{uuid.uuid4().hex}.xlsx"
-    try:
-        tmp_path.write_bytes(await file.read())
-        logger.info(f"Saved uploaded questionnaire to {tmp_path}")
-
-        count = build_index(str(tmp_path))
-        logger.info(f"Successfully indexed {count} questions from uploaded file")
-    except Exception as e:
-        error_details = f"Indexing failed: {str(e)}\n{traceback.format_exc()}"
-        logger.error(error_details)
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        tmp_path.unlink(missing_ok=True)
-
-    return IndexResponse(message=f"Indexed '{file.filename}' successfully", questions_indexed=count)
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -159,6 +154,151 @@ def query_customer(request: QueryRequest):
 
 
 ALLOWED_EXTENSIONS = {".pdf", ".xlsx"}
+
+
+@router.post("/index/upload-sops")
+async def upload_and_index_sops(
+    files: List[UploadFile] = File(...),
+    capabilities: List[str] = Form(...),
+):
+    """
+    Upload one or more SOP files (.docx / .pdf / .xlsx) with capability labels
+    and index them into the SOP chunks Azure index.
+
+    Form fields:
+      - files[]       — SOP file uploads
+      - capabilities[] — one capability label per file (same order as files)
+    """
+    from app.core.indexer import build_sop_index
+    import traceback
+
+    if len(files) != len(capabilities):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Number of files ({len(files)}) must match number of capabilities ({len(capabilities)}).",
+        )
+
+    for f in files:
+        ext = Path(f.filename).suffix.lower()
+        if ext not in ALLOWED_DOC_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '{f.filename}'. Allowed: .docx, .pdf, .xlsx",
+            )
+
+    tmp_dir = Path(tempfile.gettempdir()) / f"sops_{uuid.uuid4().hex[:8]}"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    saved: List[tuple] = []
+
+    try:
+        for upload, capability in zip(files, capabilities):
+            dest = tmp_dir / Path(upload.filename).name
+            dest.write_bytes(await upload.read())
+            saved.append((str(dest), capability.strip()))
+            logger.info(f"Saved SOP: {dest} (capability: {capability})")
+
+        total = build_sop_index(saved)
+        logger.info(f"Indexed {total} SOP chunks")
+    except Exception as e:
+        logger.error(f"SOP indexing failed: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    return {"message": f"Indexed {len(files)} SOP file(s) successfully", "chunks_indexed": total}
+
+
+@router.post("/index/upload-questions")
+async def upload_and_index_questions(
+    file: UploadFile = File(...),
+):
+    """
+    Upload a questions Excel file (.xlsx) and index it into the custom questions Azure index.
+
+    Expected columns in the Excel file: 'category' and 'question' (case-insensitive).
+    """
+    from app.core.indexer import build_questions_index
+    import traceback
+
+    if not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Only .xlsx files are accepted for questions indexing.")
+
+    tmp_path = Path(tempfile.gettempdir()) / f"questions_{uuid.uuid4().hex[:8]}.xlsx"
+    try:
+        tmp_path.write_bytes(await file.read())
+        logger.info(f"Saved questions file to {tmp_path}")
+
+        count = build_questions_index(str(tmp_path))
+        logger.info(f"Indexed {count} questions")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Questions indexing failed: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    return {"message": f"Indexed '{file.filename}' successfully", "questions_indexed": count}
+
+
+@router.post("/query-sow", response_model=SowQueryResponse)
+async def query_with_sow(
+    files: List[UploadFile] = File(...),
+    top_n: int = Form(default=20),
+):
+    """
+    Upload one or more SOW files (.docx / .pdf / .xlsx) and retrieve the most
+    relevant questions from the custom questions index.
+
+    Combines two retrieval paths:
+      1. Direct SOW → Questions (1.5× score boost)
+      2. SOW → SOP → Questions (base score, capability-mediated)
+
+    Returns top_n questions with supporting context showing which path matched.
+    """
+    from app.core.indexer import sop_index_is_built, questions_index_is_built
+    from app.core.retriever import retrieve_for_sow
+    import traceback
+
+    if not questions_index_is_built():
+        raise HTTPException(
+            status_code=400,
+            detail="Questions index not built yet. Upload a questions Excel file first via POST /index/upload-questions.",
+        )
+
+    for f in files:
+        ext = Path(f.filename).suffix.lower()
+        if ext not in ALLOWED_DOC_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '{f.filename}'. Allowed: .docx, .pdf, .xlsx",
+            )
+
+    if top_n < 1:
+        top_n = 1
+
+    session_dir = Path(tempfile.gettempdir()) / f"sow_{uuid.uuid4().hex[:8]}"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    saved_paths: List[str] = []
+
+    try:
+        for upload in files:
+            dest = session_dir / Path(upload.filename).name
+            dest.write_bytes(await upload.read())
+            saved_paths.append(str(dest))
+            logger.info(f"Saved SOW: {dest}")
+
+        result = retrieve_for_sow(sow_file_paths=saved_paths, top_n=top_n)
+        logger.info(f"SOW query returned {result['total_results']} questions")
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"SOW query failed: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        shutil.rmtree(session_dir, ignore_errors=True)
+
+    return SowQueryResponse(**result)
 
 
 @router.post("/upload-and-query", response_model=QueryResponse)

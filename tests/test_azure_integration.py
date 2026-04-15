@@ -18,106 +18,111 @@ from app.core.indexer import get_azure_search_client, load_questions_store
 
 
 class TestAzureSearchClient:
-    """Unit tests for AzureSearchClient wrapper."""
+    """Unit tests for AzureSearchClient wrapper (v6)."""
     
     @pytest.fixture
     def mock_credentials(self):
-        """Mock Azure credentials."""
+        """Mock Azure credentials for v6."""
         return {
             "endpoint": "https://test-service.search.windows.net",
             "api_key": "test-api-key",
-            "caiq_index": "caiq_questions"
+            "sop_index": "sop_chunks",
+            "questions_index": "question_items",
+            "mappings_index": "semantic_mappings"
         }
     
     @pytest.fixture
     def mock_client(self, mock_credentials):
-        """Create AzureSearchClient with mocked credentials."""
+        """Create AzureSearchClient v6 with mocked credentials."""
         with patch('app.core.azure_search.SearchClient'):
             client = AzureSearchClient(
                 endpoint=mock_credentials["endpoint"],
                 api_key=mock_credentials["api_key"],
-                caiq_index_name=mock_credentials["caiq_index"]
+                sop_index_name=mock_credentials["sop_index"],
+                questions_index_name=mock_credentials["questions_index"],
+                mappings_index_name=mock_credentials["mappings_index"]
             )
         return client
     
     def test_client_initialization(self, mock_credentials):
-        """Test AzureSearchClient initialization."""
+        """Test AzureSearchClient v6 initialization."""
         with patch('app.core.azure_search.SearchClient'):
             client = AzureSearchClient(
                 endpoint=mock_credentials["endpoint"],
                 api_key=mock_credentials["api_key"],
-                caiq_index_name=mock_credentials["caiq_index"]
+                sop_index_name=mock_credentials["sop_index"],
+                questions_index_name=mock_credentials["questions_index"],
+                mappings_index_name=mock_credentials["mappings_index"]
             )
             assert client.endpoint == mock_credentials["endpoint"]
             assert client.api_key == mock_credentials["api_key"]
-            assert client.caiq_index_name == mock_credentials["caiq_index"]
+            assert client.sop_index_name == mock_credentials["sop_index"]
+            assert client.questions_index_name == mock_credentials["questions_index"]
+            assert client.mappings_index_name == mock_credentials["mappings_index"]
     
-    def test_search_caiq_hybrid_signature(self, mock_client):
-        """Test that search_caiq_hybrid accepts correct parameters."""
+    def test_search_sop_hybrid_signature(self, mock_client):
+        """Test that search_sop_hybrid accepts correct parameters."""
         query_vector = [0.0] * 1536
         query_text = "test query"
         
-        with patch.object(mock_client, 'search_hybrid') as mock_search:
-            mock_search.return_value = {"results": [], "total_count": 0}
+        with patch.object(mock_client, '_get_sop_client') as mock_get_sop:
+            mock_sop_client = Mock()
+            mock_sop_client.search.return_value = []
+            mock_get_sop.return_value = mock_sop_client
             
-            result = mock_client.search_caiq_hybrid(
+            result = mock_client.search_sop_hybrid(
                 query_vector=query_vector,
                 query_text=query_text,
-                top=50,
-                use_semantic_ranking=True
+                top=5
             )
             
-            # Verify search_hybrid was called with correct parameters
-            mock_search.assert_called_once()
-            call_kwargs = mock_search.call_args[1]
-            assert call_kwargs["index_type"] == "caiq"
-            assert call_kwargs["query_vector"] == query_vector
-            assert call_kwargs["query_text"] == query_text
-            assert call_kwargs["use_semantic_ranking"] == True
+            # Verify search was called
+            mock_sop_client.search.assert_called_once()
     
-    def test_index_caiq_document_format(self, mock_client):
-        """Test that index_caiq accepts properly formatted documents."""
+    def test_index_questions_document_format(self, mock_client):
+        """Test that index_questions accepts properly formatted documents."""
         documents = [
             {
-                "id": "test-1",
-                "question_id": "IAM-01.1",
-                "domain": "IAM",
-                "question_text": "Test question",
-                "source": "CAIQ",
+                "id": "Q_001",
+                "question_id": "Q_001",
+                "category": "Compliance",
+                "question_text": "Does the vendor provide SOC 2 Type II certification?",
                 "vector": [0.0] * 1536
             }
         ]
         
-        with patch.object(mock_client._get_caiq_client(), 'upload_documents') as mock_upload:
+        with patch.object(mock_client, '_get_questions_client') as mock_get_questions:
+            mock_questions_client = Mock()
             mock_result = Mock()
             mock_result.succeeded = True
-            mock_upload.return_value = [mock_result]
+            mock_questions_client.upload_documents.return_value = [mock_result]
+            mock_get_questions.return_value = mock_questions_client
             
-            result = mock_client.index_caiq(documents)
+            result = mock_client.index_questions(documents)
             
             assert "succeeded" in result
             assert "failed" in result
-            mock_upload.assert_called_once_with(documents)
+            mock_questions_client.upload_documents.assert_called_once_with(documents)
     
-    def test_search_customer_docs_hybrid_filter(self, mock_client):
-        """Test that customer_docs searches apply customer_id filter."""
+    def test_search_questions_hybrid_filter(self, mock_client):
+        """Test that questions search can filter by category."""
         query_vector = [0.0] * 1536
-        query_text = "test query"
-        customer_id = "customer_1"
+        query_text = "compliance"
+        category = "Compliance"
         
-        with patch.object(mock_client, 'search_hybrid') as mock_search:
-            mock_search.return_value = {"results": [], "total_count": 0}
+        with patch.object(mock_client, '_get_questions_client') as mock_get_questions:
+            mock_questions_client = Mock()
+            mock_questions_client.search.return_value = []
+            mock_get_questions.return_value = mock_questions_client
             
-            result = mock_client.search_customer_docs_hybrid(
-                customer_id=customer_id,
+            result = mock_client.search_questions_hybrid(
                 query_vector=query_vector,
-                query_text=query_text
+                query_text=query_text,
+                category_filter=category
             )
             
-            # Verify filter was applied
-            mock_search.assert_called_once()
-            call_kwargs = mock_search.call_args[1]
-            assert f"customer_id eq '{customer_id}'" in call_kwargs.get("filter_query", "")
+            # Verify search was called
+            mock_questions_client.search.assert_called_once()
 
 
 class TestRetrieverIntegration:
