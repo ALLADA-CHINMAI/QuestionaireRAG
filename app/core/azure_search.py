@@ -7,12 +7,7 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 from azure.search.documents import SearchClient
-from azure.search.documents.models import (
-    VectorizedQuery,
-    QueryType,
-    QueryCaptionType,
-    QueryAnswerType,
-)
+from azure.search.documents.models import VectorizedQuery
 from azure.core.credentials import AzureKeyCredential
 
 logger = logging.getLogger(__name__)
@@ -154,7 +149,6 @@ class AzureSearchClient:
         index_type: str = "caiq",
         customer_id: Optional[str] = None,
         top: int = 50,
-        use_semantic_ranking: bool = True,
         filter_query: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
@@ -166,7 +160,6 @@ class AzureSearchClient:
             index_type: "caiq" or "customer_docs"
             customer_id: Required if index_type is "customer_docs"
             top: Number of top results to return
-            use_semantic_ranking: Enable semantic ranking reranking
             filter_query: Optional OData filter (e.g., "domain eq 'IAM'")
         
         Returns:
@@ -178,13 +171,11 @@ class AzureSearchClient:
                             "question_id": "...",
                             "domain": "...",
                             "question_text": "...",
-                            "score": 2.5,  # Hybrid score or semantic score
-                            "semantic_score": 0.95,  # If semantic ranking enabled
+                            "score": 2.5,  # Hybrid score
                             ...
                         }
                     ],
-                    "total_count": int,
-                    "semantic_ranking_enabled": bool
+                    "total_count": int
                 }
         """
         try:
@@ -205,20 +196,19 @@ class AzureSearchClient:
                 fields="vector"  # or "chunk_vector" for customer docs
             )
             
+            # Build select fields based on index type
+            if index_type == "caiq":
+                select_fields = ["id", "question_id", "domain", "question_text", "source"]
+            else:  # customer_docs
+                select_fields = ["id", "question_id", "domain", "question_text", "source", "doc_name", "metadata"]
+
             # Build search parameters
             search_params = {
                 "vector_queries": [vector_query],
                 "search_text": query_text,
-                "query_type": QueryType.SEMANTIC,  # Enables hybrid + semantic
-                "select": ["id", "question_id", "domain", "question_text", "source", "doc_name", "metadata"],
+                "select": select_fields,
                 "top": top,
             }
-            
-            # Add semantic ranking if enabled
-            if use_semantic_ranking:
-                search_params["query_caption"] = QueryCaptionType.EXTRACTIVE
-                search_params["query_answer"] = QueryAnswerType.EXTRACTIVE
-                search_params["semantic_configuration_name"] = "default"  # Must match index config
             
             # Add filter if provided
             if filter_query:
@@ -241,15 +231,12 @@ class AzureSearchClient:
                     "doc_name": result.get("doc_name"),
                     "metadata": result.get("metadata"),
                     "score": result.get("@search.score"),
-                    "semantic_score": result.get("@search.reranker_score"),
-                    "captions": result.get("@search.captions"),
                 })
                 total_count += 1
             
             return {
                 "results": parsed_results,
                 "total_count": total_count,
-                "semantic_ranking_enabled": use_semantic_ranking,
                 "query_vector_dims": len(query_vector),
             }
         
@@ -262,7 +249,6 @@ class AzureSearchClient:
         query_vector: List[float],
         query_text: str,
         top: int = 50,
-        use_semantic_ranking: bool = True,
         domain_filter: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
@@ -272,7 +258,6 @@ class AzureSearchClient:
             query_vector: 1536-dimensional embedding
             query_text: Search query text
             top: Number of results
-            use_semantic_ranking: Enable semantic ranking
             domain_filter: Optional domain filter (e.g., "IAM")
         
         Returns:
@@ -284,7 +269,6 @@ class AzureSearchClient:
             query_text=query_text,
             index_type="caiq",
             top=top,
-            use_semantic_ranking=use_semantic_ranking,
             filter_query=filter_query,
         )
     
@@ -294,7 +278,6 @@ class AzureSearchClient:
         query_vector: List[float],
         query_text: str,
         top: int = 50,
-        use_semantic_ranking: bool = True,
     ) -> Dict[str, Any]:
         """
         Convenience method for searching customer documents.
@@ -304,7 +287,6 @@ class AzureSearchClient:
             query_vector: 1536-dimensional embedding
             query_text: Search query text
             top: Number of results
-            use_semantic_ranking: Enable semantic ranking
         
         Returns:
             Search results dict
@@ -316,7 +298,6 @@ class AzureSearchClient:
             index_type="customer_docs",
             customer_id=customer_id,
             top=top,
-            use_semantic_ranking=use_semantic_ranking,
             filter_query=filter_query,
         )
     

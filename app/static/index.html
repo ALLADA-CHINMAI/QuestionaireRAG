@@ -284,13 +284,6 @@
         <label for="top-k">Top K results</label>
         <input type="number" id="top-k" value="20" min="1" max="263" />
       </div>
-      <div class="field">
-        <label>Semantic ranking</label>
-        <div class="toggle-wrap">
-          <div class="toggle on" id="semantic-toggle" onclick="toggleSemantic()"></div>
-          <span class="toggle-label" id="semantic-label">Enabled</span>
-        </div>
-      </div>
     </div>
 
     <button class="btn btn-primary" id="query-btn" disabled onclick="submitQuery()" style="margin-top:18px">
@@ -347,7 +340,6 @@
   // ── State ──
   let qFile = null;
   let customerFiles = [];
-  let semanticEnabled = true;
   let indexIsReady = false;
 
   // ── On load: check index status ──
@@ -453,12 +445,6 @@
     document.getElementById('query-btn').disabled = customerFiles.length === 0;
   }, true);
 
-  function toggleSemantic() {
-    semanticEnabled = !semanticEnabled;
-    document.getElementById('semantic-toggle').classList.toggle('on', semanticEnabled);
-    document.getElementById('semantic-label').textContent = semanticEnabled ? 'Enabled' : 'Disabled';
-  }
-
   async function submitQuery() {
     if (!customerFiles.length) return;
     setQueryLoading(true);
@@ -467,7 +453,6 @@
     const fd = new FormData();
     customerFiles.forEach(f => fd.append('files', f));
     fd.append('top_k', document.getElementById('top-k').value);
-    fd.append('use_semantic_ranking', semanticEnabled);
 
     try {
       const res = await fetch('/upload-and-query', { method: 'POST', body: fd });

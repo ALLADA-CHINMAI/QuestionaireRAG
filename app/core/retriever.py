@@ -35,7 +35,6 @@ def retrieve_for_customer(
     customer_id: str,
     customers_base_dir: str = "data/customers",
     top_k: int = DEFAULT_TOP_K,
-    use_semantic_ranking: bool = True,
 ) -> Dict:
     """
     End-to-end retrieval pipeline for a single customer using Azure Cognitive Search.
@@ -44,7 +43,6 @@ def retrieve_for_customer(
         customer_id:        folder name under customers_base_dir (e.g. "customer_1").
         customers_base_dir: base directory containing all customer folders.
         top_k:              number of final ranked questions to return.
-        use_semantic_ranking: enable semantic ranking for better relevance (recommended).
 
     Returns:
         Dict with keys:
@@ -94,7 +92,6 @@ def retrieve_for_customer(
             query_vector=query_vector,
             query_text=context_summary,
             top=top_k,
-            use_semantic_ranking=use_semantic_ranking,
         )
     except Exception as e:
         logger.error(f"Hybrid search failed: {str(e)}")
@@ -121,10 +118,6 @@ def retrieve_for_customer(
             "source": q.get("source", azure_result.get("source", "")),
             "score": round(azure_result.get("score", 0.0), 6),  # Hybrid score from Azure
         }
-        
-        # Optionally include semantic ranking score if available
-        if use_semantic_ranking and "semantic_score" in azure_result:
-            result_dict["semantic_score"] = round(azure_result["semantic_score"], 6)
         
         results.append(result_dict)
 

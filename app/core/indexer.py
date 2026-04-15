@@ -33,6 +33,23 @@ AZURE_SEARCH_ENDPOINT = os.getenv("AZURE_SEARCH_ENDPOINT")
 AZURE_SEARCH_API_KEY = os.getenv("AZURE_SEARCH_API_KEY")
 AZURE_SEARCH_CAIQ_INDEX_NAME = os.getenv("AZURE_SEARCH_CAIQ_INDEX_NAME", "caiq_questions")
 
+
+def sanitize_azure_key(key: str) -> str:
+    """
+    Sanitize a key to make it Azure Cognitive Search compliant.
+    Azure keys can only contain letters, digits, underscore (_), dash (-), or equal sign (=).
+    
+    Args:
+        key: Original key that may contain invalid characters like & or spaces
+        
+    Returns:
+        Sanitized key with invalid characters replaced by underscore
+    """
+    import re
+    # Replace any character that's NOT a letter, digit, underscore, dash, or equal sign
+    sanitized = re.sub(r'[^a-zA-Z0-9_\-=]', '_', key)
+    return sanitized
+
 def build_index(xlsx_path: str) -> int:
     """
     Full index build pipeline with Azure Cognitive Search:
@@ -92,8 +109,8 @@ def build_index(xlsx_path: str) -> int:
     for i, question_id in enumerate(ids):
         q = questions[i]
         doc = {
-            "id": question_id,  # Use question_id as document ID
-            "question_id": question_id,
+            "id": sanitize_azure_key(question_id),  # Sanitize ID (replace & and other invalid chars with _)
+            "question_id": question_id,  # Keep original ID for reference
             "domain": q.get("domain", ""),
             "question_text": q.get("question_text", ""),
             "source": q.get("source", "CAIQ"),

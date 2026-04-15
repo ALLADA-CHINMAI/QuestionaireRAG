@@ -1,0 +1,67 @@
+{
+  "name": "caiq_questions",
+  "fields": [
+    {
+      "name": "id",
+      "type": "Edm.String",
+      "key": true,
+      "filterable": true,
+      "sortable": true
+    },
+    {
+      "name": "question_id",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": true,
+      "sortable": true,
+      "facetable": true
+    },
+    {
+      "name": "domain",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": true,
+      "sortable": true,
+      "facetable": true
+    },
+    {
+      "name": "question_text",
+      "type": "Edm.String",
+      "searchable": true,
+      "sortable": true
+    },
+    {
+      "name": "source",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": true,
+      "facetable": true
+    },
+    {
+      "name": "vector",
+      "type": "Collection(Edm.Single)",
+      "dimensions": 1536,
+      "vectorSearchProfile": "my-vector-config"
+    }
+  ],
+  "vectorSearch": {
+    "algorithms": [
+      {
+        "name": "my-hnsw",
+        "kind": "hnsw",
+        "hnswParameters": {
+          "m": 4,
+          "efConstruction": 400,
+          "efSearch": 500,
+          "metric": "cosine"
+        }
+      }
+    ],
+    "profiles": [
+      {
+        "name": "my-vector-config",
+        "algorithm": "my-hnsw"
+      }
+    ]
+  }
+}

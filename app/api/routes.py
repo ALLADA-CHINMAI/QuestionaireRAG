@@ -10,6 +10,8 @@ from pathlib import Path
 import logging
 import shutil
 import uuid
+import tempfile
+import os
 from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
@@ -37,7 +39,6 @@ class IndexResponse(BaseModel):
 class QueryRequest(BaseModel):
     customer_id: str = Field(..., example="customer_1")
     top_k: int = Field(default=20, ge=1, le=263)
-    use_semantic_ranking: bool = Field(default=True, description="Enable semantic ranking for better relevance")
 
 
 class QuestionResult(BaseModel):
@@ -46,7 +47,6 @@ class QuestionResult(BaseModel):
     domain: str
     question: str
     score: float = Field(..., description="Hybrid search score (vector + BM25)")
-    semantic_score: Optional[float] = Field(default=None, description="Semantic ranking score (if enabled)")
     source: str
 
 
@@ -102,7 +102,8 @@ async def upload_and_index_questionnaire(
     if not file.filename.lower().endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="Only .xlsx files are accepted for questionnaire indexing.")
 
-    tmp_path = Path(f"/tmp/caiq_upload_{uuid.uuid4().hex}.xlsx")
+    tmp_dir = tempfile.gettempdir()
+    tmp_path = Path(tmp_dir) / f"caiq_upload_{uuid.uuid4().hex}.xlsx"
     try:
         tmp_path.write_bytes(await file.read())
         logger.info(f"Saved uploaded questionnaire to {tmp_path}")
@@ -145,7 +146,6 @@ def query_customer(request: QueryRequest):
             customer_id=request.customer_id,
             customers_base_dir=CUSTOMERS_BASE_DIR,
             top_k=request.top_k,
-            use_semantic_ranking=request.use_semantic_ranking,
         )
         logger.info(f"Successfully retrieved {result['total_results']} questions")
     except FileNotFoundError as e:
@@ -165,7 +165,6 @@ ALLOWED_EXTENSIONS = {".pdf", ".xlsx"}
 async def upload_and_query(
     files: List[UploadFile] = File(...),
     top_k: int = Form(default=20),
-    use_semantic_ranking: bool = Form(default=True),
 ):
     """Upload customer documents (PDF/XLSX) and get ranked CAIQ questions in one step."""
     from app.core.indexer import index_is_built
@@ -201,7 +200,6 @@ async def upload_and_query(
             customer_id=session_id,
             customers_base_dir=CUSTOMERS_BASE_DIR,
             top_k=top_k,
-            use_semantic_ranking=use_semantic_ranking,
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e))
