@@ -5,7 +5,7 @@ Full pipeline for a single customer query:
   1. Load + parse customer SOP/SOW PDFs via ingestor.
   2. Summarize key security topics with Azure OpenAI gpt-4o (embedder).
   3. Embed summary as 1536-dim vector (Azure OpenAI ada-002).
-  4. Run hybrid search on Azure CS CAIQ index (vector + BM25 + semantic ranking).
+  4. Run hybrid search on Azure CS PSmart questions index (vector + BM25 + semantic ranking).
   5. (Optional) Index customer docs and search them as well.
   6. Merge results and enrich with full question metadata.
   7. Return top-K ranked results.
@@ -23,7 +23,7 @@ from app.core.embedder import embed_query, embed_texts, summarize_customer_conte
 from app.core.indexer import (
     get_azure_search_client,
     load_questions_store,
-    load_custom_questions_store,
+    load_psmart_questions_store,
 )
 from app.core.ingestor import load_customer_docs, load_sow_file
 
@@ -73,7 +73,7 @@ def retrieve_for_customer(
     # ------------------------------------------------------------------
     # Step 2 — Summarize with Azure OpenAI gpt-4o to produce a focused search query
     # The summary highlights security topics, compliance needs, and risk areas —
-    # the themes that map most directly onto CAIQ domains.
+    # the themes that map most directly onto PSmart question domains.
     # ------------------------------------------------------------------
     logger.info("Summarizing customer context with Azure OpenAI gpt-4o...")
     context_summary = summarize_customer_context(customer_text)
@@ -86,13 +86,13 @@ def retrieve_for_customer(
     query_vector = embed_query(context_summary)
 
     # ------------------------------------------------------------------
-    # Step 4 — Hybrid search on Azure CS CAIQ index
+    # Step 4 — Hybrid search on Azure CS PSmart questions index
     # Azure CS handles both vector search (HNSW, cosine) and BM25 simultaneously,
     # with optional semantic ranking for relevance reranking.
     # ------------------------------------------------------------------
-    logger.info("Running hybrid search on CAIQ index (vector + BM25 + semantic ranking)...")
+    logger.info("Running hybrid search on PSmart questions index (vector + BM25 + semantic ranking)...")
     try:
-        search_result = azure_client.search_caiq_hybrid(
+        search_result = azure_client.search_questions_hybrid(
             query_vector=query_vector,
             query_text=context_summary,
             top=top_k,
@@ -208,7 +208,7 @@ def retrieve_for_sow(
 
     # ── Step 3: Search ────────────────────────────────────────────────────────
     azure_client = get_azure_search_client()
-    questions_store = load_custom_questions_store()
+    questions_store = load_psmart_questions_store()
 
     # Accumulator: question_id → best candidate
     candidates: Dict[str, Dict] = {}

@@ -1,5 +1,5 @@
 """
-Indexer: builds and indexes the CAIQ dataset to Azure Cognitive Search.
+Indexer: builds and indexes the PSmart questions dataset to Azure Cognitive Search.
 
 Uses Azure Cognitive Search with hybrid indexing:
   1. Dense indexing — 1536-dim embeddings for semantic vector search (HNSW algorithm)
@@ -7,7 +7,7 @@ Uses Azure Cognitive Search with hybrid indexing:
   3. questions_store — JSON lookup table mapping question_id → full metadata,
                        used to enrich search results at query time.
 
-The CAIQ questions are indexed to Azure Cognitive Search and persisted there.
+The PSmart questions are indexed to Azure Cognitive Search and persisted there.
 Metadata is also cached locally in questions_store.json for quick enrichment.
 """
 
@@ -19,7 +19,7 @@ from typing import List, Dict, Optional
 
 from app.core.azure_search import AzureSearchClient
 from app.core.embedder import embed_texts
-from app.core.ingestor import load_caiq_questions, load_sop_file, load_questions_xlsx
+from app.core.ingestor import load_psmart_questions, load_sop_file, load_questions_xlsx
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +28,14 @@ logger = logging.getLogger(__name__)
 # JSON file mapping question_id → full question dict (for result enrichment)
 QUESTIONS_STORE_PATH = "data/questions_store.json"
 SOP_STORE_PATH = "data/sop_store.json"
-CUSTOM_QUESTIONS_STORE_PATH = "data/custom_questions_store.json"
+PSMART_QUESTIONS_STORE_PATH = "data/psmart_questions_store.json"
 
 # Azure Search configuration (loaded from environment)
 AZURE_SEARCH_ENDPOINT = os.getenv("AZURE_SEARCH_ENDPOINT")
 AZURE_SEARCH_API_KEY = os.getenv("AZURE_SEARCH_API_KEY")
-AZURE_SEARCH_CAIQ_INDEX_NAME = os.getenv("AZURE_SEARCH_CAIQ_INDEX_NAME", "caiq_questions")
 AZURE_SEARCH_SOP_INDEX_NAME = os.getenv("AZURE_SEARCH_SOP_INDEX_NAME", "sop_chunks")
-AZURE_SEARCH_QUESTIONS_INDEX_NAME = os.getenv("AZURE_SEARCH_QUESTIONS_INDEX_NAME", "custom_questions")
+AZURE_SEARCH_QUESTIONS_INDEX_NAME = os.getenv("AZURE_SEARCH_QUESTIONS_INDEX_NAME", "psmart_questions")
+AZURE_SEARCH_MAPPINGS_INDEX_NAME = os.getenv("AZURE_SEARCH_MAPPINGS_INDEX_NAME", "semantic_mappings")
 
 
 def sanitize_azure_key(key: str) -> str:
@@ -57,16 +57,16 @@ def sanitize_azure_key(key: str) -> str:
 def build_index(xlsx_path: str) -> int:
     """
     Full index build pipeline with Azure Cognitive Search:
-      1. Parse CAIQ XLSX → list of question dicts.
+      1. Parse PSmart questions XLSX → list of question dicts.
       2. Embed all question texts → dense vectors (OpenAI, 1536-dim).
       3. Format and upload to Azure Cognitive Search (hybrid index with HNSW + BM25).
       4. Cache question metadata locally in questions_store.json.
 
     Existing documents in Azure CS are replaced on each call so the index
-    always reflects the current CAIQ file.
+    always reflects the current questions file.
 
     Args:
-        xlsx_path: path to the CAIQ Excel file.
+        xlsx_path: path to the PSmart questions Excel file.
 
     Returns:
         Number of questions successfully indexed.
@@ -78,9 +78,9 @@ def build_index(xlsx_path: str) -> int:
             "Set AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_API_KEY in .env"
         )
     
-    # Step 1 — Parse CAIQ XLSX into structured question dicts
-    logger.info("Loading questions from CAIQ...")
-    questions = load_caiq_questions(xlsx_path)
+    # Step 1 — Parse PSmart questions XLSX into structured question dicts
+    logger.info("Loading questions from PSmart...")
+    questions = load_psmart_questions(xlsx_path)
     logger.info(f"  Found {len(questions)} questions")
 
     # Extract parallel lists of texts and IDs for indexing
@@ -97,7 +97,9 @@ def build_index(xlsx_path: str) -> int:
     client = AzureSearchClient(
         endpoint=AZURE_SEARCH_ENDPOINT,
         api_key=AZURE_SEARCH_API_KEY,
-        caiq_index_name=AZURE_SEARCH_CAIQ_INDEX_NAME
+        sop_index_name=AZURE_SEARCH_SOP_INDEX_NAME,
+        questions_index_name=AZURE_SEARCH_QUESTIONS_INDEX_NAME,
+        mappings_index_name=AZURE_SEARCH_MAPPINGS_INDEX_NAME
     )
     
     # Verify connection
@@ -117,14 +119,14 @@ def build_index(xlsx_path: str) -> int:
             "question_id": question_id,  # Keep original ID for reference
             "domain": q.get("domain", ""),
             "question_text": q.get("question_text", ""),
-            "source": q.get("source", "CAIQ"),
+            "source": q.get("source", "PSmart"),
             "vector": embeddings[i],  # 1536-dim embedding for hybrid search
         }
         documents.append(doc)
 
     # Step 5 — Upload to Azure Cognitive Search
     logger.info(f"Uploading {len(documents)} documents to Azure Cognitive Search...")
-    result = client.index_caiq(documents)
+    result = client.index_psmart(documents)
     
     succeeded = result.get("succeeded", 0)
     failed = result.get("failed", 0)
@@ -161,6 +163,11 @@ def build_sop_index(sop_files: List[tuple]) -> int:
     Returns:
         Number of chunks successfully indexed.
     """
+    print("\n" + "="*80)
+    print("BUILD_SOP_INDEX CALLED")
+    print(f"Files to process: {len(sop_files)}")
+    print("="*80 + "\n")
+    
     if not AZURE_SEARCH_ENDPOINT or not AZURE_SEARCH_API_KEY:
         raise ValueError(
             "Azure Cognitive Search credentials not found. "
@@ -181,8 +188,12 @@ def build_sop_index(sop_files: List[tuple]) -> int:
 
     # Step 2 — Batch embed all chunks
     logger.info(f"Embedding {len(all_chunks)} SOP chunks...")
+    print(f"\n>>> About to call embed_texts() with {len(all_chunks)} chunks")
+    print(f">>> First chunk preview: {all_chunks[0]['chunk_text'][:100]}...")
     texts = [c["chunk_text"] for c in all_chunks]
+    print(f">>> Calling embed_texts now...")
     embeddings = embed_texts(texts)
+    print(f">>> embed_texts returned {len(embeddings)} embeddings\n")
 
     # Step 3 — Build Azure documents
     documents = []
@@ -203,9 +214,9 @@ def build_sop_index(sop_files: List[tuple]) -> int:
     client = AzureSearchClient(
         endpoint=AZURE_SEARCH_ENDPOINT,
         api_key=AZURE_SEARCH_API_KEY,
-        caiq_index_name=AZURE_SEARCH_CAIQ_INDEX_NAME,
         sop_index_name=AZURE_SEARCH_SOP_INDEX_NAME,
         questions_index_name=AZURE_SEARCH_QUESTIONS_INDEX_NAME,
+        mappings_index_name=AZURE_SEARCH_MAPPINGS_INDEX_NAME,
     )
     result = client.index_sop_chunks(documents)
     succeeded = result.get("succeeded", 0)
@@ -273,9 +284,9 @@ def build_questions_index(xlsx_path: str) -> int:
     client = AzureSearchClient(
         endpoint=AZURE_SEARCH_ENDPOINT,
         api_key=AZURE_SEARCH_API_KEY,
-        caiq_index_name=AZURE_SEARCH_CAIQ_INDEX_NAME,
         sop_index_name=AZURE_SEARCH_SOP_INDEX_NAME,
         questions_index_name=AZURE_SEARCH_QUESTIONS_INDEX_NAME,
+        mappings_index_name=AZURE_SEARCH_MAPPINGS_INDEX_NAME,
     )
     result = client.index_questions(documents)
     succeeded = result.get("succeeded", 0)
@@ -284,9 +295,9 @@ def build_questions_index(xlsx_path: str) -> int:
         logger.warning(f"  {failed} questions failed to index")
 
     # Step 5 — Cache question metadata locally
-    logger.info(f"Caching question metadata to {CUSTOM_QUESTIONS_STORE_PATH}...")
-    Path(CUSTOM_QUESTIONS_STORE_PATH).parent.mkdir(parents=True, exist_ok=True)
-    with open(CUSTOM_QUESTIONS_STORE_PATH, "w") as f:
+    logger.info(f"Caching question metadata to {PSMART_QUESTIONS_STORE_PATH}...")
+    Path(PSMART_QUESTIONS_STORE_PATH).parent.mkdir(parents=True, exist_ok=True)
+    with open(PSMART_QUESTIONS_STORE_PATH, "w") as f:
         json.dump({q["question_id"]: q for q in questions}, f, indent=2)
 
     logger.info(f"  Successfully indexed {succeeded} questions")
@@ -312,9 +323,9 @@ def get_azure_search_client() -> AzureSearchClient:
     return AzureSearchClient(
         endpoint=AZURE_SEARCH_ENDPOINT,
         api_key=AZURE_SEARCH_API_KEY,
-        caiq_index_name=AZURE_SEARCH_CAIQ_INDEX_NAME,
         sop_index_name=AZURE_SEARCH_SOP_INDEX_NAME,
         questions_index_name=AZURE_SEARCH_QUESTIONS_INDEX_NAME,
+        mappings_index_name=AZURE_SEARCH_MAPPINGS_INDEX_NAME,
     )
 
 
@@ -356,26 +367,26 @@ def load_questions_store() -> Dict:
         return json.load(f)
 
 
-def load_custom_questions_store() -> Dict:
+def load_psmart_questions_store() -> Dict:
     """
     Load the custom questions metadata store from disk (new flow).
 
     Returns:
         Dict mapping question_id (str) → {question_id, category, question_text}.
     """
-    if not os.path.exists(CUSTOM_QUESTIONS_STORE_PATH):
+    if not os.path.exists(PSMART_QUESTIONS_STORE_PATH):
         raise FileNotFoundError(
-            f"Custom questions store not found at {CUSTOM_QUESTIONS_STORE_PATH}. "
+            f"Custom questions store not found at {PSMART_QUESTIONS_STORE_PATH}. "
             "Upload and index a questions Excel file first."
         )
 
-    with open(CUSTOM_QUESTIONS_STORE_PATH, "r") as f:
+    with open(PSMART_QUESTIONS_STORE_PATH, "r") as f:
         return json.load(f)
 
 
 def index_is_built() -> bool:
     """
-    Check whether the CAIQ index is built in Azure Cognitive Search (legacy).
+    Check whether the PSmart questions index is built in Azure Cognitive Search.
 
     Returns:
         True if questions_store.json exists and Azure CS is reachable.
@@ -406,6 +417,6 @@ def questions_index_is_built() -> bool:
     Check whether the custom questions index has been built.
 
     Returns:
-        True if custom_questions_store.json exists on disk.
+        True if psmart_questions_store.json exists on disk.
     """
-    return os.path.exists(CUSTOM_QUESTIONS_STORE_PATH)
+    return os.path.exists(PSMART_QUESTIONS_STORE_PATH)

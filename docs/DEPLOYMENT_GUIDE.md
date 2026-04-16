@@ -78,7 +78,7 @@ AZURE_SEARCH_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 3. Use the schema from [docs/azure_index_schemas.md](../docs/azure_index_schemas.md)
 4. Or use REST API:
 ```bash
-curl -X PUT https://questionnaire-search.search.windows.net/indexes/caiq_questions?api-version=2024-07-01 \
+curl -X PUT https://questionnaire-search.search.windows.net/indexes/psmart_questions?api-version=2024-07-01 \
   -H "Content-Type: application/json" \
   -H "api-key: YOUR_ADMIN_KEY" \
   -d @docs/index_schema_caiq.json
@@ -107,7 +107,7 @@ EMBEDINGS_OPENAI_DEPLOYMENT_NAME=text-embedding-ada-002
 # Azure Cognitive Search (NEW — add these)
 AZURE_SEARCH_ENDPOINT=https://questionnaire-search.search.windows.net
 AZURE_SEARCH_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-AZURE_SEARCH_CAIQ_INDEX_NAME=caiq_questions
+AZURE_SEARCH_QUESTIONS_INDEX_NAME=psmart_questions
 ```
 
 ### 2.3 Verify File Structure
@@ -223,7 +223,7 @@ Test search returned 50 results
 ### 4.4 Verify Data in Azure Portal
 
 1. Go to Azure Cognitive Search service in Portal
-2. Click "Indexes" → "caiq_questions"
+2. Click "Indexes" → "psmart_questions"
 3. Verify document count shows 1200 (or your CAIQ size)
 
 ---
@@ -549,7 +549,7 @@ Restart server after updating `.env`.
 ### Issue: Queries return no results after indexing
 
 **Solution**:
-1. Check index has documents: `curl https://questionnaire-search.search.windows.net/indexes/caiq_questions/docs/$count`
+1. Check index has documents: `curl https://questionnaire-search.search.windows.net/indexes/psmart_questions/docs/$count`
 2. Verify `questions_store.json` is populated
 3. Check Azure CS health in Portal
 

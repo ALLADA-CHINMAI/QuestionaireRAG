@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# v6: Removed hardcoded CAIQ path — questions are now uploaded dynamically via POST /data/upload-questions
+# v6: Questions are uploaded dynamically via POST /data/upload-questions
 CUSTOMERS_BASE_DIR = "data/customers"
 
 ALLOWED_DOC_EXTENSIONS = {".pdf", ".xlsx", ".docx"}
@@ -106,7 +106,7 @@ def health():
         "sop_index_built": sop_built,
         "sop_chunks_indexed": sop_chunks,
         "questions_index_built": q_built,
-        "custom_questions_indexed": q_count,
+        "psmart_questions_indexed": q_count,
     }
 
 # v6: Legacy /index/questionnaires and /index/upload-questionnaire endpoints removed.
@@ -171,6 +171,9 @@ async def upload_and_index_sops(
     """
     from app.core.indexer import build_sop_index
     import traceback
+    
+    logger.info(f"=== SOP INDEXING REQUEST STARTED ===")
+    logger.info(f"Received {len(files)} files with {len(capabilities)} capabilities")
 
     if len(files) != len(capabilities):
         raise HTTPException(
@@ -197,6 +200,7 @@ async def upload_and_index_sops(
             saved.append((str(dest), capability.strip()))
             logger.info(f"Saved SOP: {dest} (capability: {capability})")
 
+        logger.info(f"Calling build_sop_index with {len(saved)} files...")
         total = build_sop_index(saved)
         logger.info(f"Indexed {total} SOP chunks")
     except Exception as e:
@@ -306,14 +310,14 @@ async def upload_and_query(
     files: List[UploadFile] = File(...),
     top_k: int = Form(default=20),
 ):
-    """Upload customer documents (PDF/XLSX) and get ranked CAIQ questions in one step."""
+    """Upload customer documents (PDF/XLSX) and get ranked PSmart questions in one step."""
     from app.core.indexer import index_is_built
     from app.core.retriever import retrieve_for_customer
 
     if not index_is_built():
         raise HTTPException(
             status_code=400,
-            detail="CAIQ index not built yet. Call POST /index/questionnaires first.",
+            detail="PSmart questions index not built yet. Upload questions first.",
         )
 
     # Validate file types

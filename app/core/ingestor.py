@@ -2,12 +2,8 @@
 Ingestor: parses documents into structured data for indexing and retrieval.
 
 Responsibilities:
-  - load_caiq_questions(): reads the CAIQ Excel file (legacy flow).
-  - load_customer_docs(): reads customer PDFs/XLSX for text (legacy flow).
-  - parse_document(): universal parser for docx/pdf/xlsx files.
-  - chunk_text(): word-based overlapping chunker (~400 tokens / 100 overlap).
-  - load_sop_file(): parse + chunk a single SOP file with a capability tag.
-  - load_sow_file(): parse + chunk a single SOW file.
+  - load_psmart_questions(): reads the PSmart questions Excel file.
+  - load_customer_docs(): reads customer PDFs/XLSX for text.
   - load_questions_xlsx(): parse a questions Excel (category + question cols).
 """
 
@@ -21,24 +17,24 @@ import fitz  # PyMuPDF
 
 # --- Constants ---
 
-# Valid CAIQ question IDs follow the pattern: DOMAIN-##.## (e.g. IAM-01.1, A&A-03.2)
+# Valid PSmart question IDs follow the pattern: DOMAIN-##.## (e.g. IAM-01.1, A&A-03.2)
 VALID_ID_PATTERN = re.compile(r"^[A-Z&]+-\d+\.\d+$")
 
 
 # ---------------------------------------------------------------------------
-# CAIQ XLSX Parser
+# PSmart Questions XLSX Parser
 # ---------------------------------------------------------------------------
 
-def load_caiq_questions(xlsx_path: str) -> List[Dict]:
+def load_psmart_questions(xlsx_path: str) -> List[Dict]:
     """
-    Parse the CAIQ XLSX file and return a list of question dicts.
+    Parse the PSmart questions XLSX file and return a list of question dicts.
 
-    Reads the 'CAIQv4.0.3' sheet, skips header/footer rows using
+    Reads the first sheet, skips header/footer rows using
     VALID_ID_PATTERN, and extracts the question ID, domain (derived
     from the ID prefix), and cleaned question text.
 
     Args:
-        xlsx_path: absolute or relative path to the CAIQ .xlsx file.
+        xlsx_path: absolute or relative path to the questions .xlsx file.
 
     Returns:
         List of dicts, each with keys:
@@ -49,7 +45,8 @@ def load_caiq_questions(xlsx_path: str) -> List[Dict]:
     """
     # Open workbook in read-only mode for memory efficiency
     wb = openpyxl.load_workbook(xlsx_path, read_only=True)
-    ws = wb["CAIQv4.0.3"]
+    # Get first sheet (assumes questions are in first sheet)
+    ws = wb.worksheets[0]
 
     questions = []
     for row in ws.iter_rows(values_only=True):
@@ -76,6 +73,8 @@ def load_caiq_questions(xlsx_path: str) -> List[Dict]:
 
     wb.close()
     return questions
+
+
 
 
 # ---------------------------------------------------------------------------

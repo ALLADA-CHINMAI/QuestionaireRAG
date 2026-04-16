@@ -1,0 +1,347 @@
+{
+  "ACCESS_CONTROL_001": {
+    "question_id": "ACCESS_CONTROL_001",
+    "category": "Access Control",
+    "question_text": "Does the engagement enforce role-based access controls (RBAC) and conduct periodic access reviews for all accounts?"
+  },
+  "ACCESS_CONTROL_002": {
+    "question_id": "ACCESS_CONTROL_002",
+    "category": "Access Control",
+    "question_text": "Are privileged accounts managed with just-in-time (time-bound) access and multi-factor authentication (MFA) for enhanced security?"
+  },
+  "ACCESS_CONTROL_003": {
+    "question_id": "ACCESS_CONTROL_003",
+    "category": "Access Control",
+    "question_text": "Are all administrative and other high-privilege credentials stored in a secure vault with regular rotation and controlled access approvals?"
+  },
+  "ACCESS_CONTROL_004": {
+    "question_id": "ACCESS_CONTROL_004",
+    "category": "Access Control",
+    "question_text": "Are user accounts promptly de-provisioned or adjusted when personnel change roles or leave the project to avoid orphaned accounts?"
+  },
+  "ACCESS_CONTROL_005": {
+    "question_id": "ACCESS_CONTROL_005",
+    "category": "Access Control",
+    "question_text": "Is there a privilege inventory (mapping of tools, roles, and user accounts) maintained to support access audits and ensure least privilege?"
+  },
+  "ACCESS_CONTROL_006": {
+    "question_id": "ACCESS_CONTROL_006",
+    "category": "Access Control",
+    "question_text": "Does each user have a unique user account (no shared or generic accounts) to maintain accountability and traceability for system access?"
+  },
+  "ACCESS_CONTROL_007": {
+    "question_id": "ACCESS_CONTROL_007",
+    "category": "Access Control",
+    "question_text": "Are system access logs and administrator actions regularly monitored and audited for unusual access patterns or policy violations?"
+  },
+  "DATA_PROTECTION_001": {
+    "question_id": "DATA_PROTECTION_001",
+    "category": "Data Protection",
+    "question_text": "Are all sensitive data (including PII/PHI) encrypted both at rest and in transit, using industry-standard encryption algorithms and key management practices?"
+  },
+  "DATA_PROTECTION_002": {
+    "question_id": "DATA_PROTECTION_002",
+    "category": "Data Protection",
+    "question_text": "Are secure data handling, storage, and disposal policies in place (e.g., limited data retention, data destruction after use) to prevent unauthorized access or leakage?"
+  },
+  "DATA_PROTECTION_003": {
+    "question_id": "DATA_PROTECTION_003",
+    "category": "Data Protection",
+    "question_text": "Is a data classification and labeling scheme implemented to identify sensitive healthcare data (e.g., by sensitivity or compliance requirements) and enforce proper handling?"
+  },
+  "DATA_PROTECTION_004": {
+    "question_id": "DATA_PROTECTION_004",
+    "category": "Data Protection",
+    "question_text": "Are Data Loss Prevention (DLP) measures (e.g., monitoring, content filtering) implemented to detect and prevent unauthorized transfer of sensitive information?"
+  },
+  "DATA_PROTECTION_005": {
+    "question_id": "DATA_PROTECTION_005",
+    "category": "Data Protection",
+    "question_text": "If production data (e.g., PHI) is used in non-production environments, is it properly sanitized or masked to protect privacy?"
+  },
+  "DATA_PROTECTION_006": {
+    "question_id": "DATA_PROTECTION_006",
+    "category": "Data Protection",
+    "question_text": "Are remote workstations and networks used by the delivery team required to meet security standards (VPN, updated antivirus, device encryption) to safeguard client data?"
+  },
+  "DATA_PROTECTION_007": {
+    "question_id": "DATA_PROTECTION_007",
+    "category": "Data Protection",
+    "question_text": "For remote support sessions, are there controls to ensure confidentiality (e.g., secure remote access tools, no local data recording) to avoid exposing PHI unnecessarily?"
+  },
+  "REGULATORY_COMP_001": {
+    "question_id": "REGULATORY_COMP_001",
+    "category": "Regulatory Compliance",
+    "question_text": "Can the service provider produce evidence of compliance with relevant healthcare regulations (e.g., HIPAA, GDPR) and contract-specific security/privacy requirements?"
+  },
+  "REGULATORY_COMP_002": {
+    "question_id": "REGULATORY_COMP_002",
+    "category": "Regulatory Compliance",
+    "question_text": "Are formal compliance audits or assessments conducted regularly to ensure adherence to legal and contractual obligations?"
+  },
+  "REGULATORY_COMP_003": {
+    "question_id": "REGULATORY_COMP_003",
+    "category": "Regulatory Compliance",
+    "question_text": "Have all project team members completed mandatory compliance trainings (e.g., HIPAA, data privacy/security training) and acknowledged relevant NDA/BAA agreements?"
+  },
+  "REGULATORY_COMP_004": {
+    "question_id": "REGULATORY_COMP_004",
+    "category": "Regulatory Compliance",
+    "question_text": "Is there a process to stay updated on changes in healthcare regulations (e.g., HIPAA updates) and to incorporate those changes into the projects practices?"
+  },
+  "REGULATORY_COMP_005": {
+    "question_id": "REGULATORY_COMP_005",
+    "category": "Regulatory Compliance",
+    "question_text": "Are Business Associate Agreements (BAAs) or similar legal agreements in place for all parties handling PHI, and are they reviewed for compliance?"
+  },
+  "REGULATORY_COMP_006": {
+    "question_id": "REGULATORY_COMP_006",
+    "category": "Regulatory Compliance",
+    "question_text": "Does the engagement have defined protocols to promptly report any compliance incidents or data breaches to customers and regulators as required by law?"
+  },
+  "REGULATORY_COMP_007": {
+    "question_id": "REGULATORY_COMP_007",
+    "category": "Regulatory Compliance",
+    "question_text": "Are data retention and archival policies aligned with healthcare regulatory requirements and client expectations (e.g., data retention periods, secure archival)?"
+  },
+  "SKILL_ALIGNMENT_001": {
+    "question_id": "SKILL_ALIGNMENT_001",
+    "category": "Skill Alignment",
+    "question_text": "Are team members technical skills and certifications (including healthcare IT or EHR systems expertise) clearly matched to the projects requirements?"
+  },
+  "SKILL_ALIGNMENT_002": {
+    "question_id": "SKILL_ALIGNMENT_002",
+    "category": "Skill Alignment",
+    "question_text": "Do team members have prior experience in similar healthcare projects or with relevant technologies (e.g., clinical systems, medical device software) to ensure domain familiarity?"
+  },
+  "SKILL_ALIGNMENT_003": {
+    "question_id": "SKILL_ALIGNMENT_003",
+    "category": "Skill Alignment",
+    "question_text": "Is a skills/competency matrix maintained to ensure all necessary technical, domain, and project management competencies are covered by the team?"
+  },
+  "SKILL_ALIGNMENT_004": {
+    "question_id": "SKILL_ALIGNMENT_004",
+    "category": "Skill Alignment",
+    "question_text": "Are key roles (project manager, solution architect, technical leads) staffed with individuals possessing adequate seniority and a proven track record in similar projects?"
+  },
+  "SKILL_ALIGNMENT_005": {
+    "question_id": "SKILL_ALIGNMENT_005",
+    "category": "Skill Alignment",
+    "question_text": "Is there a plan or budget for ongoing training, certifications, or upskilling to address any skill gaps identified in the team during the project?"
+  },
+  "SKILL_ALIGNMENT_006": {
+    "question_id": "SKILL_ALIGNMENT_006",
+    "category": "Skill Alignment",
+    "question_text": "Does the team have access to specialized subject matter experts (e.g., compliance officers, cybersecurity specialists) when complex issues arise?"
+  },
+  "TEAM_COMPOSITIO_001": {
+    "question_id": "TEAM_COMPOSITIO_001",
+    "category": "Team Composition",
+    "question_text": "Is the delivery team appropriately staffed to meet project demands (considering volume of work, timelines, and complexity of deliverables)?"
+  },
+  "TEAM_COMPOSITIO_002": {
+    "question_id": "TEAM_COMPOSITIO_002",
+    "category": "Team Composition",
+    "question_text": "Are roles and responsibilities within the team clearly defined and balanced across project management, technical, and domain areas to avoid gaps or overlaps?"
+  },
+  "TEAM_COMPOSITIO_003": {
+    "question_id": "TEAM_COMPOSITIO_003",
+    "category": "Team Composition",
+    "question_text": "Are backup resources or cross-training plans in place to cover critical roles and mitigate single points of failure on the team?"
+  },
+  "TEAM_COMPOSITIO_004": {
+    "question_id": "TEAM_COMPOSITIO_004",
+    "category": "Team Composition",
+    "question_text": "Is there a procedure for quickly onboarding new or replacement team members (with knowledge transfer) to minimize disruption to the project?"
+  },
+  "TEAM_COMPOSITIO_005": {
+    "question_id": "TEAM_COMPOSITIO_005",
+    "category": "Team Composition",
+    "question_text": "Are processes in place to manage resource transitions (e.g., replacing staff with 30-60 days notice) without impacting timelines or quality?"
+  },
+  "TEAM_COMPOSITIO_006": {
+    "question_id": "TEAM_COMPOSITIO_006",
+    "category": "Team Composition",
+    "question_text": "For variable workloads, are triggers or thresholds defined to scale the team up or down (e.g., adding resources if volume increases) to maintain service levels?"
+  },
+  "TEAM_COMPOSITIO_007": {
+    "question_id": "TEAM_COMPOSITIO_007",
+    "category": "Team Composition",
+    "question_text": "If 24/7 support or multi-time-zone coverage is required, is team staffing structured (shifts, on-call rotation) to meet those needs adequately?"
+  },
+  "SCOPE_CLARITY_001": {
+    "question_id": "SCOPE_CLARITY_001",
+    "category": "Scope Clarity",
+    "question_text": "Is the projects scope of work clearly defined in a Statement of Work (SOW) or contract, including detailed deliverables and specific in-scope and out-of-scope items?"
+  },
+  "SCOPE_CLARITY_002": {
+    "question_id": "SCOPE_CLARITY_002",
+    "category": "Scope Clarity",
+    "question_text": "Is there an established change control process for any modifications to scope, requiring documented approval before changes are implemented?"
+  },
+  "SCOPE_CLARITY_003": {
+    "question_id": "SCOPE_CLARITY_003",
+    "category": "Scope Clarity",
+    "question_text": "Are acceptance criteria and acceptance processes for key deliverables clearly defined and agreed upon by the client (e.g., sign-offs, review periods)?"
+  },
+  "SCOPE_CLARITY_004": {
+    "question_id": "SCOPE_CLARITY_004",
+    "category": "Scope Clarity",
+    "question_text": "Are out-of-scope requests or tasks identified and managed via a formal process (logged, evaluated, and approved or deferred) to prevent scope creep?"
+  },
+  "SCOPE_CLARITY_005": {
+    "question_id": "SCOPE_CLARITY_005",
+    "category": "Scope Clarity",
+    "question_text": "Have critical assumptions, dependencies, and constraints related to scope been validated and agreed with the client to avoid misunderstandings?"
+  },
+  "SCOPE_CLARITY_006": {
+    "question_id": "SCOPE_CLARITY_006",
+    "category": "Scope Clarity",
+    "question_text": "For fixed-price engagements, are milestones and deliverables tied to payment terms and clearly defined to avoid misalignment on completion criteria?"
+  },
+  "VENDOR_COORDINA_001": {
+    "question_id": "VENDOR_COORDINA_001",
+    "category": "Vendor Coordination",
+    "question_text": "Are roles and responsibilities across all vendors and internal teams clearly delineated (e.g., through a multi-party RACI matrix) to avoid gaps or overlaps in accountability?"
+  },
+  "VENDOR_COORDINA_002": {
+    "question_id": "VENDOR_COORDINA_002",
+    "category": "Vendor Coordination",
+    "question_text": "Is there a shared project plan or integrated schedule that accounts for deliverables and dependencies across multiple vendors involved?"
+  },
+  "VENDOR_COORDINA_003": {
+    "question_id": "VENDOR_COORDINA_003",
+    "category": "Vendor Coordination",
+    "question_text": "Are regular cross-vendor meetings or sync-ups held with documented action items to ensure alignment and manage interdependencies?"
+  },
+  "VENDOR_COORDINA_004": {
+    "question_id": "VENDOR_COORDINA_004",
+    "category": "Vendor Coordination",
+    "question_text": "Has a primary point of contact or integration manager been designated to coordinate between the client and all service providers for consistent communication?"
+  },
+  "VENDOR_COORDINA_005": {
+    "question_id": "VENDOR_COORDINA_005",
+    "category": "Vendor Coordination",
+    "question_text": "Is there an agreed mechanism for cross-vendor issue resolution and escalation (to handle issues that span across multiple service providers)?"
+  },
+  "GOVERNANCE_FRAM_001": {
+    "question_id": "GOVERNANCE_FRAM_001",
+    "category": "Governance Framework",
+    "question_text": "Is a governance structure established (steering committees, project review boards) with regular meetings to oversee project progress and address issues/escalations?"
+  },
+  "GOVERNANCE_FRAM_002": {
+    "question_id": "GOVERNANCE_FRAM_002",
+    "category": "Governance Framework",
+    "question_text": "Are escalation paths and decision-making authorities clearly documented (who can approve what) to facilitate timely resolution of issues and changes?"
+  },
+  "GOVERNANCE_FRAM_003": {
+    "question_id": "GOVERNANCE_FRAM_003",
+    "category": "Governance Framework",
+    "question_text": "Is a formal risk management process in place (e.g., maintaining a risk register and reviewing it periodically) as part of project governance?"
+  },
+  "GOVERNANCE_FRAM_004": {
+    "question_id": "GOVERNANCE_FRAM_004",
+    "category": "Governance Framework",
+    "question_text": "Are major decisions, action items, and changes recorded (e.g., in meeting minutes or decision logs) to ensure accountability and traceability?"
+  },
+  "GOVERNANCE_FRAM_005": {
+    "question_id": "GOVERNANCE_FRAM_005",
+    "category": "Governance Framework",
+    "question_text": "Is there an agreed-upon cadence for executive status reviews or steering committee meetings (e.g., monthly/quarterly) involving senior stakeholders from both sides?"
+  },
+  "GOVERNANCE_FRAM_006": {
+    "question_id": "GOVERNANCE_FRAM_006",
+    "category": "Governance Framework",
+    "question_text": "Is a Business Continuity Plan (BCP) or contingency plan documented for the project, and is it reviewed or tested as part of governance to handle major disruptions?"
+  },
+  "STAKEHOLDER_ENG_001": {
+    "question_id": "STAKEHOLDER_ENG_001",
+    "category": "Stakeholder Engagement",
+    "question_text": "Is a comprehensive communication plan in place (meeting schedule, status reports, etc.) to keep all stakeholders regularly informed of progress and issues?"
+  },
+  "STAKEHOLDER_ENG_002": {
+    "question_id": "STAKEHOLDER_ENG_002",
+    "category": "Stakeholder Engagement",
+    "question_text": "For critical incidents or major milestones, is there a defined communication protocol (e.g., rapid notification, regular updates) to keep stakeholders updated in real-time?"
+  },
+  "STAKEHOLDER_ENG_003": {
+    "question_id": "STAKEHOLDER_ENG_003",
+    "category": "Stakeholder Engagement",
+    "question_text": "Are stakeholder expectations and satisfaction monitored (e.g., through periodic feedback or surveys) and are adjustments made based on their feedback?"
+  },
+  "STAKEHOLDER_ENG_004": {
+    "question_id": "STAKEHOLDER_ENG_004",
+    "category": "Stakeholder Engagement",
+    "question_text": "Has a stakeholder mapping been done to identify key stakeholders and tailor communication frequency/detail according to their needs/interest?"
+  },
+  "STAKEHOLDER_ENG_005": {
+    "question_id": "STAKEHOLDER_ENG_005",
+    "category": "Stakeholder Engagement",
+    "question_text": "If stakeholders are in multiple regions/time zones, are communication and meeting times adjusted to accommodate them effectively?"
+  },
+  "SLA_KPI_DEFINIT_001": {
+    "question_id": "SLA_KPI_DEFINIT_001",
+    "category": "SLA/KPI Definition",
+    "question_text": "Are Service Level Agreements (SLAs) and Key Performance Indicators (KPIs) clearly defined, documented, and aligned with the engagement\u00e2\u20ac\u2122s objectives and client expectations?"
+  },
+  "SLA_KPI_DEFINIT_002": {
+    "question_id": "SLA_KPI_DEFINIT_002",
+    "category": "SLA/KPI Definition",
+    "question_text": "Is there a system or tool in place to measure, track, and report on each SLA/KPI at the agreed reporting interval (e.g., weekly, monthly)?"
+  },
+  "SLA_KPI_DEFINIT_003": {
+    "question_id": "SLA_KPI_DEFINIT_003",
+    "category": "SLA/KPI Definition",
+    "question_text": "Are the SLA targets realistic, mutually agreed upon, and based on either historical data or industry benchmarks to ensure achievability?"
+  },
+  "SLA_KPI_DEFINIT_004": {
+    "question_id": "SLA_KPI_DEFINIT_004",
+    "category": "SLA/KPI Definition",
+    "question_text": "Are any penalties, rewards, or at-risk fee mechanisms associated with SLA performance clearly defined in the contract and understood by the team?"
+  },
+  "SLA_KPI_DEFINIT_005": {
+    "question_id": "SLA_KPI_DEFINIT_005",
+    "category": "SLA/KPI Definition",
+    "question_text": "Does the engagement have criteria for SLA exceptions (e.g., downtime due to force majeure) and a process for documenting and approving such exceptions?"
+  },
+  "SLA_KPI_DEFINIT_006": {
+    "question_id": "SLA_KPI_DEFINIT_006",
+    "category": "SLA/KPI Definition",
+    "question_text": "Is there a defined process to periodically review and renegotiate KPIs/SLAs (if needed) based on changing circumstances or after initial baselining?"
+  },
+  "PERFORMANCE_MON_001": {
+    "question_id": "PERFORMANCE_MON_001",
+    "category": "Performance Monitoring",
+    "question_text": "Is project performance closely monitored via dashboards or reports that track key metrics (e.g., schedule adherence, effort burn, quality metrics) against targets?"
+  },
+  "PERFORMANCE_MON_002": {
+    "question_id": "PERFORMANCE_MON_002",
+    "category": "Performance Monitoring",
+    "question_text": "Are any deviations from project plan or performance metrics identified early and communicated, with corrective action plans developed and tracked?"
+  },
+  "PERFORMANCE_MON_003": {
+    "question_id": "PERFORMANCE_MON_003",
+    "category": "Performance Monitoring",
+    "question_text": "Are quality metrics (defect rates, rework percentages, test coverage, etc.) captured and analyzed to maintain deliverable quality?"
+  },
+  "PERFORMANCE_MON_004": {
+    "question_id": "PERFORMANCE_MON_004",
+    "category": "Performance Monitoring",
+    "question_text": "Is delivery budget or effort usage tracked (e.g., hours vs. budget for T&M engagements, or cost-to-complete for fixed-price) and shared with stakeholders?"
+  },
+  "PERFORMANCE_MON_005": {
+    "question_id": "PERFORMANCE_MON_005",
+    "category": "Performance Monitoring",
+    "question_text": "Does the team conduct regular retrospectives or lessons-learned sessions to identify process improvements for ongoing or future phases/projects?"
+  },
+  "PERFORMANCE_MON_006": {
+    "question_id": "PERFORMANCE_MON_006",
+    "category": "Performance Monitoring",
+    "question_text": "Are performance trends analyzed (across months/quarters) to identify early warning signs of issues (like throughput decline or cost overrun) and inform leadership proactively?"
+  },
+  "PERFORMANCE_MON_007": {
+    "question_id": "PERFORMANCE_MON_007",
+    "category": "Performance Monitoring",
+    "question_text": "Do stakeholders have access to a real-time or periodic performance dashboard providing transparency into project status and any emerging risks/issues?"
+  }
+}

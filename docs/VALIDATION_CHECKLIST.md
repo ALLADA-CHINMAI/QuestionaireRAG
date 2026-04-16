@@ -18,12 +18,12 @@ This document provides a step-by-step validation checklist for the migration fro
   ```
   AZURE_SEARCH_ENDPOINT=https://your-service.search.windows.net
   AZURE_SEARCH_API_KEY=your-admin-key
-  AZURE_SEARCH_CAIQ_INDEX_NAME=caiq_questions
+  AZURE_SEARCH_QUESTIONS_INDEX_NAME=psmart_questions
   ```
 
 ### ✓ Phase 2: Index Creation
 
-- [ ] **CAIQ Index Created**: `caiq_questions` index exists in Azure CS
+- [ ] **CAIQ Index Created**: `psmart_questions` index exists in Azure CS
   - [ ] Correct schema with 1536-dim vector field
   - [ ] HNSW algorithm configured
   - [ ] Semantic ranking enabled
@@ -31,7 +31,7 @@ This document provides a step-by-step validation checklist for the migration fro
   
 - [ ] **Verify Index Schema** via Azure Portal or REST API:
   ```bash
-  curl -X GET "https://{service-name}.search.windows.net/indexes/caiq_questions?api-version=2024-07-01" \
+  curl -X GET "https://{service-name}.search.windows.net/indexes/psmart_questions?api-version=2024-07-01" \
     -H "api-key: {admin-key}"
   ```
 

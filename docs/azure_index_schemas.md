@@ -12,7 +12,7 @@ Two index types are needed:
 
 ## Index 1: CAIQ Questions Index
 
-**Index Name**: `caiq_questions`
+**Index Name**: `psmart_questions`
 
 ### Fields
 
@@ -107,12 +107,12 @@ Two index types are needed:
 ### REST API Example: Create Index
 
 ```bash
-PUT https://{service-name}.search.windows.net/indexes/caiq_questions?api-version=2024-07-01
+PUT https://{service-name}.search.windows.net/indexes/psmart_questions?api-version=2024-07-01
 Content-Type: application/json
 api-key: {admin-key}
 
 {
-  "name": "caiq_questions",
+  "name": "psmart_questions",
   "fields": [
     {
       "name": "id",
@@ -455,7 +455,7 @@ api-key: {admin-key}
 
 5. **Verify Connection**
    - Run health check via Python client or REST API
-   - Example query: `GET https://{service-name}.search.windows.net/indexes/caiq_questions?api-version=2024-07-01`
+   - Example query: `GET https://{service-name}.search.windows.net/indexes/psmart_questions?api-version=2024-07-01`
 
 ---
 

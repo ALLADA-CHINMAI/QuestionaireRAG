@@ -132,7 +132,7 @@ class TestRetrieverIntegration:
     def mock_azure_client(self):
         """Mock Azure Cognitive Search client."""
         client = Mock(spec=AzureSearchClient)
-        client.search_caiq_hybrid.return_value = {
+        client.search_questions_hybrid.return_value = {
             "results": [
                 {
                     "id": "1",
@@ -164,13 +164,13 @@ class TestRetrieverIntegration:
                 "question_id": "IAM-01.1",
                 "domain": "IAM",
                 "question_text": "Test question from store",
-                "source": "CAIQ"
+                "source": "PSmart"
             },
             "IAM-01.2": {
                 "question_id": "IAM-01.2",
                 "domain": "IAM",
                 "question_text": "Another test question from store",
-                "source": "CAIQ"
+                "source": "PSmart"
             }
         }
     
@@ -219,8 +219,8 @@ class TestRetrieverIntegration:
         assert "semantic_score" in first_q
         
         # Verify Azure client was called correctly
-        mock_azure_client.search_caiq_hybrid.assert_called_once()
-        call_kwargs = mock_azure_client.search_caiq_hybrid.call_args[1]
+        mock_azure_client.search_questions_hybrid.assert_called_once()
+        call_kwargs = mock_azure_client.search_questions_hybrid.call_args[1]
         assert call_kwargs["query_vector"] == [0.0] * 1536
         assert call_kwargs["query_text"] == "Summarized security topics"
         assert call_kwargs["use_semantic_ranking"] == True
@@ -236,7 +236,9 @@ class TestErrorHandling:
             client = AzureSearchClient(
                 endpoint="https://test.search.windows.net",
                 api_key="test-key",
-                caiq_index_name="caiq_questions"
+                sop_index_name="sop_chunks",
+                questions_index_name="psmart_questions",
+                mappings_index_name="semantic_mappings"
             )
         return client
     
@@ -247,11 +249,14 @@ class TestErrorHandling:
                 get_azure_search_client()
     
     @patch('app.core.azure_search.SearchClient')
-    def test_index_caiq_partial_failure(self, mock_search_client):
+    def test_index_psmart_partial_failure(self, mock_search_client):
         """Test handling of partial indexing failures."""
         client = AzureSearchClient(
             endpoint="https://test.search.windows.net",
-            api_key="test-key"
+            api_key="test-key",
+            sop_index_name="sop_chunks",
+            questions_index_name="psmart_questions",
+            mappings_index_name="semantic_mappings"
         )
         
         # Mock mixed success/failure results
@@ -269,7 +274,7 @@ class TestErrorHandling:
         
         documents = [{"id": "1", "vector": [0.0] * 1536}] * 2
         
-        result = client.index_caiq(documents)
+        result = client.index_psmart(documents)
         
         assert result["succeeded"] == 1
         assert result["failed"] == 1

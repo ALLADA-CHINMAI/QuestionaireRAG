@@ -390,7 +390,7 @@ async function checkStatus() {
       `SOPs indexed — ${data.sop_chunks_indexed || 0} chunks`,
       'SOP index not built');
     updateBadge('badge-q', qIndexReady,
-      `Questions indexed — ${data.custom_questions_indexed || 0} questions`,
+      `Questions indexed — ${data.psmart_questions_indexed || 0} questions`,
       'Questions index not built');
     updateStep2();
   } catch {

@@ -1,24 +1,21 @@
 """
-"""Create Azure Cognitive Search indexes via SDK (v6).
+Create Azure Cognitive Search indexes via SDK (v6).
 
-Creates three indexes:
-  1. sop_chunks              — SOP document chunks (vector + BM25)
-  2. question_items          — custom questions from uploaded Excel (vector + BM25)
-  3. semantic_mappings       — SOP capability → Question category mappings
+Creates two main indexes:
+  1. sop_chunks          — SOP document chunks (vector + BM25)
+  2. psmart_questions    — PSmart questions from uploaded Excel (vector + BM25)
 
 Use this when the Azure Portal is blocked due to private network access restrictions.
 
 Usage:
-    python scripts/create_index.py                  # creates all three indexes
+    python scripts/create_index.py                  # creates all indexes
     python scripts/create_index.py --index sop      # sop_chunks only
-    python scripts/create_index.py --index questions # question_items only
-    python scripts/create_index.py --index mappings # semantic_mappings only
+    python scripts/create_index.py --index questions # psmart_questions only
 
 Prerequisites:
     - AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_API_KEY in .env
     - Your machine must be on the allowed network (VPN/private endpoint if required)
 """
-
 import os
 import sys
 import logging
@@ -50,72 +47,6 @@ load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-
-
-def create_caiq_index(endpoint: str, api_key: str, index_name: str = "caiq_questions") -> None:
-    credential = AzureKeyCredential(api_key)
-    client = SearchIndexClient(endpoint=endpoint, credential=credential)
-
-    fields = [
-        SimpleField(name="id", type=SearchFieldDataType.String, key=True, filterable=True),
-        SearchableField(name="question_id", type=SearchFieldDataType.String, filterable=True, retrievable=True),
-        SearchableField(name="domain", type=SearchFieldDataType.String, filterable=True, retrievable=True),
-        SearchableField(name="question_text", type=SearchFieldDataType.String, retrievable=True),
-        SimpleField(name="source", type=SearchFieldDataType.String, filterable=True, retrievable=True),
-        SimpleField(name="doc_name", type=SearchFieldDataType.String, retrievable=True),
-        SimpleField(name="metadata", type=SearchFieldDataType.String, retrievable=True),
-        SearchField(
-            name="vector",
-            type=SearchFieldDataType.Collection(SearchFieldDataType.Single),
-            searchable=True,
-            retrievable=False,
-            vector_search_dimensions=1536,
-            vector_search_profile_name="default-profile",
-        ),
-    ]
-
-    vector_search = VectorSearch(
-        algorithms=[
-            HnswAlgorithmConfiguration(
-                name="default-hnsw",
-                parameters=HnswParameters(
-                    m=4,
-                    ef_construction=400,
-                    ef_search=500,
-                    metric="cosine",
-                ),
-            )
-        ],
-        profiles=[
-            VectorSearchProfile(name="default-profile", algorithm_configuration_name="default-hnsw")
-        ],
-    )
-
-    semantic_search = SemanticSearch(
-        configurations=[
-            SemanticConfiguration(
-                name="default",
-                prioritized_fields=SemanticPrioritizedFields(
-                    content_fields=[SemanticField(field_name="question_text")],
-                    keywords_fields=[
-                        SemanticField(field_name="domain"),
-                        SemanticField(field_name="question_id"),
-                    ],
-                ),
-            )
-        ]
-    )
-
-    index = SearchIndex(
-        name=index_name,
-        fields=fields,
-        vector_search=vector_search,
-        semantic_search=semantic_search,
-    )
-
-    logger.info(f"Creating index '{index_name}'...")
-    result = client.create_or_update_index(index)
-    logger.info(f"Index '{result.name}' created/updated successfully.")
 
 
 def _make_vector_search_and_semantic(content_field: str, keyword_fields: list):
@@ -185,7 +116,7 @@ def create_sop_index(endpoint: str, api_key: str, index_name: str = "sop_chunks"
     logger.info(f"SOP index '{result.name}' created/updated successfully.")
 
 
-def create_custom_questions_index(endpoint: str, api_key: str, index_name: str = "custom_questions") -> None:
+def create_psmart_questions_index(endpoint: str, api_key: str, index_name: str = "psmart_questions") -> None:
     """Create the custom questions index (vector + BM25)."""
     credential = AzureKeyCredential(api_key)
     client = SearchIndexClient(endpoint=endpoint, credential=credential)
@@ -221,6 +152,33 @@ def create_custom_questions_index(endpoint: str, api_key: str, index_name: str =
     logger.info(f"Custom questions index '{result.name}' created/updated successfully.")
 
 
+def create_semantic_mappings_index(endpoint: str, api_key: str, index_name: str = "semantic_mappings") -> None:
+    """Create the semantic mappings index."""
+    credential = AzureKeyCredential(api_key)
+    client = SearchIndexClient(endpoint=endpoint, credential=credential)
+
+    fields = [
+        SimpleField(name="id", type=SearchFieldDataType.String, key=True, filterable=True),
+        SearchableField(name="sop_capability", type=SearchFieldDataType.String, filterable=True, retrievable=True),
+        SearchableField(name="question_category", type=SearchFieldDataType.String, filterable=True, retrievable=True),
+    ]
+
+    vector_search, semantic_search = _make_vector_search_and_semantic(
+        "sop_capability", ["question_category"]
+    )
+
+    index = SearchIndex(
+        name=index_name,
+        fields=fields,
+        vector_search=vector_search,
+        semantic_search=semantic_search,
+    )
+
+    logger.info(f"Creating semantic mappings index '{index_name}'...")
+    result = client.create_or_update_index(index)
+    logger.info(f"Semantic mappings index '{result.name}' created/updated successfully.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Create Azure Cognitive Search indexes")
     parser.add_argument(
@@ -245,7 +203,9 @@ def main():
         if args.index in ("sop", "all"):
             create_sop_index(endpoint, api_key, sop_name)
         if args.index in ("questions", "all"):
-            create_custom_questions_index(endpoint, api_key, q_name)
+            create_psmart_questions_index(endpoint, api_key, q_name)
+        if args.index in ("mappings", "all"):
+            create_semantic_mappings_index(endpoint, api_key, os.getenv("AZURE_SEARCH_MAPPINGS_INDEX_NAME", "semantic_mappings"))
         return 0
     except Exception as e:
         logger.error(f"Failed to create index: {e}")

@@ -49,28 +49,44 @@ def _get_token() -> str:
     
     # Check if we have a cached token that's still valid (with 5 min buffer)
     if _token_cache["token"] and time.time() < (_token_cache["expires_at"] - 300):
+        remaining_mins = int((_token_cache["expires_at"] - time.time()) / 60)
+        print(f"Using cached Azure AD token (expires in {remaining_mins} minutes)")
         return _token_cache["token"]
     
     # Get a new token
-    credential = _get_credential()
-    token_result = credential.get_token(os.environ["AUTH_SCOPE"])
-    
-    _token_cache["token"] = token_result.token
-    _token_cache["expires_at"] = token_result.expires_on
-    
-    return token_result.token
+    print(f"Getting new Azure AD token for scope: {os.environ['AUTH_SCOPE']}")
+    try:
+        credential = _get_credential()
+        token_result = credential.get_token(os.environ["AUTH_SCOPE"])
+        
+        _token_cache["token"] = token_result.token
+        _token_cache["expires_at"] = token_result.expires_on
+        
+        expires_in = int((token_result.expires_on - time.time()) / 60)
+        print(f"✓ Got new Azure AD token (valid for {expires_in} minutes)")
+        
+        return token_result.token
+    except Exception as e:
+        print(f"❌ Failed to get Azure AD token: {e}")
+        raise
 
 
 def _get_openai_client() -> AzureOpenAI:
     """
     Return (or create) the shared Azure OpenAI client.
     Uses Azure AD token in Authorization header + api-key for API Management.
+    Recreates client when token is close to expiry to ensure fresh token.
     """
     global _openai_client
-    if _openai_client is None:
-        print("Initializing Azure OpenAI client with Azure AD + subscription key...")
+    
+    # Recreate client if it doesn't exist OR token is expiring soon (5 min buffer)
+    if _openai_client is None or time.time() >= (_token_cache["expires_at"] - 300):
+        if _openai_client is not None:
+            print("Refreshing Azure OpenAI client with new token...")
+        else:
+            print("Initializing Azure OpenAI client with Azure AD + subscription key...")
         
-        # Get initial token
+        # Get fresh token
         token = _get_token()
         
         _openai_client = AzureOpenAI(
@@ -103,12 +119,19 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
     """
     client = _get_openai_client()
     
-    response = client.embeddings.create(
-        model=os.environ["EMBEDINGS_OPENAI_DEPLOYMENT_NAME"],
-        input=texts
-    )
-    
-    return [data.embedding for data in response.data]
+    try:
+        print(f"Embedding {len(texts)} texts with model: {os.environ['EMBEDINGS_OPENAI_DEPLOYMENT_NAME']}")
+        response = client.embeddings.create(
+            model=os.environ["EMBEDINGS_OPENAI_DEPLOYMENT_NAME"],
+            input=texts
+        )
+        print(f"✓ Successfully embedded {len(texts)} texts")
+        return [data.embedding for data in response.data]
+    except Exception as e:
+        print(f"❌ Embedding failed: {e}")
+        print(f"   Endpoint: {os.environ['OPENAI_ENDPOINT']}")
+        print(f"   Model: {os.environ['EMBEDINGS_OPENAI_DEPLOYMENT_NAME']}")
+        raise
 
 
 def embed_query(text: str) -> List[float]:
@@ -137,7 +160,7 @@ def summarize_customer_context(customer_text: str) -> str:
 
     The summary concentrates on security topics, compliance requirements,
     risk areas, and technologies — exactly the themes that map well onto
-    CAIQ question domains. This summary becomes the search query fed into
+    PSmart question domains. This summary becomes the search query fed into
     both the dense and sparse retrieval stages.
 
     Only the first 8000 characters of customer_text are sent to keep

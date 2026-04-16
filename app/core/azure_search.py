@@ -10,6 +10,9 @@ from azure.search.documents import SearchClient
 from azure.search.documents.models import VectorizedQuery
 from azure.core.credentials import AzureKeyCredential
 
+# Ensure debug logs are enabled
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,8 +34,9 @@ class AzureSearchClient:
         endpoint: str,
         api_key: str,
         sop_index_name: str = "sop_chunks",
-        questions_index_name: str = "question_items",
+        questions_index_name: str = "psmart_questions",
         mappings_index_name: str = "semantic_mappings",
+        **kwargs
     ):
         """
         Initialize Azure Search client (v6).
@@ -41,9 +45,15 @@ class AzureSearchClient:
             endpoint:             Azure Cognitive Search endpoint
             api_key:              Azure Cognitive Search API key
             sop_index_name:       Name of the SOP chunks index
-            questions_index_name: Name of the questions items index
+            questions_index_name: Name of the PSmart questions index
             mappings_index_name:  Name of the semantic mappings index
         """
+        # DEBUG: Log any unexpected keyword arguments
+        if kwargs:
+            logger.error(f"⚠️ UNEXPECTED KWARGS PASSED TO AzureSearchClient.__init__: {kwargs}")
+            logger.error(f"⚠️ This file is at: {__file__}")
+            raise TypeError(f"AzureSearchClient.__init__() got unexpected keyword arguments: {list(kwargs.keys())}")
+        
         self.endpoint = endpoint
         self.api_key = api_key
         self.sop_index_name = sop_index_name
@@ -77,7 +87,7 @@ class AzureSearchClient:
         return self._sop_client
 
     def _get_questions_client(self) -> SearchClient:
-        """Get or create SearchClient for the custom questions index."""
+        """Get or create SearchClient for the PSmart questions index."""
         if self._questions_client is None:
             self._questions_client = SearchClient(
                 endpoint=self.endpoint,
@@ -146,6 +156,33 @@ class AzureSearchClient:
             return {"succeeded": succeeded, "failed": len(failed), "errors": failed}
         except Exception as e:
             logger.error(f"Error indexing questions: {e}")
+            raise
+
+    def index_psmart(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Upload PSmart questions to the questions index.
+
+        Expected document structure:
+            {
+                "id":            "sanitized_id",  # sanitized key
+                "question_id":   "original-id",
+                "domain":        "Security",
+                "question_text": "Does the organization...",
+                "source":        "PSmart",
+                "vector":        [1536-dim float list],
+            }
+        """
+        try:
+            client = self._get_questions_client()
+            result = client.upload_documents(documents)
+            failed = [r for r in result if not r.succeeded]
+            succeeded = len(result) - len(failed)
+            logger.info(f"PSmart indexing: {succeeded} succeeded, {len(failed)} failed")
+            if failed:
+                logger.error(f"Failed PSmart docs: {failed[:3]}")
+            return {"succeeded": succeeded, "failed": len(failed), "errors": failed}
+        except Exception as e:
+            logger.error(f"Error indexing PSmart questions: {e}")
             raise
 
     def search_sop_hybrid(
