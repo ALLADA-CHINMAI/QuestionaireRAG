@@ -141,7 +141,7 @@ def retrieve_for_customer(
 
 # Priority boost applied to questions matched directly from the SOW
 # (vs. questions reached via an SOP intermediary)
-SOW_DIRECT_BOOST = 1.5
+SOW_DIRECT_BOOST = 1.2
 
 # Maximum SOW chunks to process per file (keeps Azure Search call count bounded)
 MAX_CHUNKS_PER_SOW = 15
