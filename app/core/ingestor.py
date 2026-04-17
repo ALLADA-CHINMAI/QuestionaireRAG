@@ -10,15 +10,19 @@ Responsibilities:
 import re
 from pathlib import Path
 from typing import List, Dict
+from typing import List, Callable
 
 import openpyxl
 import fitz  # PyMuPDF
-
+import tiktoken
 
 # --- Constants ---
 
 # Valid PSmart question IDs follow the pattern: DOMAIN-##.## (e.g. IAM-01.1, A&A-03.2)
 VALID_ID_PATTERN = re.compile(r"^[A-Z&]+-\d+\.\d+$")
+
+# Tokenizer aligned with OpenAI / modern embedding models
+_TOKENIZER = tiktoken.get_encoding("cl100k_base")
 
 
 # ---------------------------------------------------------------------------
@@ -196,40 +200,120 @@ def parse_document(file_path: str) -> str:
 # Text chunker (word-based, ~400 tokens / 100 overlap)
 # ---------------------------------------------------------------------------
 
-def chunk_text(text: str, chunk_size: int = 300, overlap: int = 75) -> List[str]:
+# def chunk_text(text: str, chunk_size: int = 300, overlap: int = 75) -> List[str]:
+#     """
+#     Split text into overlapping word-based chunks.
+
+#     Approximates token counts (1 token ≈ ~1.3 words for English):
+#       - chunk_size=300 words ≈ 400 tokens
+#       - overlap=75 words ≈ 100 tokens
+
+#     Args:
+#         text:       input text to chunk.
+#         chunk_size: words per chunk (default 300 ≈ 400 tokens).
+#         overlap:    word overlap between consecutive chunks (default 75).
+
+#     Returns:
+#         List of non-empty chunk strings.
+#     """
+#     words = text.split()
+#     if not words:
+#         return []
+
+#     chunks = []
+#     start = 0
+#     while start < len(words):
+#         end = min(start + chunk_size, len(words))
+#         chunk = " ".join(words[start:end])
+#         if chunk.strip():
+#             chunks.append(chunk)
+#         if end >= len(words):
+#             break
+#         start += chunk_size - overlap
+
+#     return chunks
+
+
+
+
+def token_len(text: str) -> int:
+    return len(_TOKENIZER.encode(text))
+
+
+def chunk_text(
+    text: str,
+    chunk_size: int = 400,   # tokens
+    overlap: int = 100       # tokens
+) -> List[str]:
     """
-    Split text into overlapping word-based chunks.
+    Recursively split text into token-based chunks.
 
-    Approximates token counts (1 token ≈ ~1.3 words for English):
-      - chunk_size=300 words ≈ 400 tokens
-      - overlap=75 words ≈ 100 tokens
+    Strategy:
+      paragraphs → lines → sentences → clauses → words → token windowing
 
-    Args:
-        text:       input text to chunk.
-        chunk_size: words per chunk (default 300 ≈ 400 tokens).
-        overlap:    word overlap between consecutive chunks (default 75).
-
-    Returns:
-        List of non-empty chunk strings.
+    Guarantees:
+      - Token limits are respected
+      - Semantic boundaries preserved when possible
     """
-    words = text.split()
-    if not words:
+
+    separators = [
+        "\n\n",  # paragraphs
+        "\n",    # lines
+        ". ",    # sentences
+        ", ",    # clauses
+        " "      # words
+    ]
+
+    def recursive_split(text: str, level: int) -> List[str]:
+        # Base case: fits within token limit
+        if token_len(text) <= chunk_size:
+            return [text.strip()]
+
+        # Last resort: hard token slicing with overlap
+        if level >= len(separators):
+            tokens = _TOKENIZER.encode(text)
+            chunks = []
+            start = 0
+
+            while start < len(tokens):
+                end = min(start + chunk_size, len(tokens))
+                chunk_tokens = tokens[start:end]
+                chunk_text = _TOKENIZER.decode(chunk_tokens)
+
+                if chunk_text.strip():
+                    chunks.append(chunk_text)
+
+                if end >= len(tokens):
+                    break
+
+                start += chunk_size - overlap
+
+            return chunks
+
+        sep = separators[level]
+        parts = text.split(sep)
+
+        results = []
+        buffer = ""
+
+        for part in parts:
+            candidate = (buffer + sep + part) if buffer else part
+            if token_len(candidate) <= chunk_size:
+                buffer = candidate
+            else:
+                if buffer:
+                    results.extend(recursive_split(buffer, level + 1))
+                buffer = part
+
+        if buffer:
+            results.extend(recursive_split(buffer, level + 1))
+
+        return results
+
+    if not text.strip():
         return []
 
-    chunks = []
-    start = 0
-    while start < len(words):
-        end = min(start + chunk_size, len(words))
-        chunk = " ".join(words[start:end])
-        if chunk.strip():
-            chunks.append(chunk)
-        if end >= len(words):
-            break
-        start += chunk_size - overlap
-
-    return chunks
-
-
+    return recursive_split(text, level=0)
 # ---------------------------------------------------------------------------
 # SOP file loader (parse + chunk with capability tag)
 # ---------------------------------------------------------------------------

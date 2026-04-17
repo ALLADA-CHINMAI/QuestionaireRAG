@@ -158,12 +158,12 @@ def _score_batch(
         for i, q in enumerate(batch)
     ])
     
-    prompt = f"""You are a security assessment expert analyzing Statement of Work (SOW) documents.
+    prompt = f"""You are a security assessment expert analyzing Statement of Work (SOW) documents with SOP implementation context.
 
 **SOW Context:**
 {sow_context}
 
-**Relevant SOP Context:**
+**Relevant SOP Context (Implementation Procedures):**
 {sop_context}
 
 **Questions to Evaluate:**
@@ -176,24 +176,47 @@ For each question above, rate its relevance to the SOW/SOP context on a scale of
 - 7-8: High relevance (question directly applicable and important)
 - 9-10: Critical relevance (question is essential for this specific engagement)
 
+**Scoring Approach:**
+
+1. **Multi-hop Reasoning:** Consider both direct SOW matches AND SOP procedural connections:
+   - Does the question match explicit SOW language? (Direct relevance)
+   - Does it relate to HOW SOW requirements will be implemented based on SOP procedures? (Via SOP relevance)
+   - Example: SOW mentions "onboard resources" → SOP details OPID creation/tool access → Question about "account provisioning workflows" scores HIGH
+
+2. **Category-Specific Boosts:** Apply higher scores when these categories match engagement context:
+   - **Access Control** questions: +1.5 points if SOW mentions user access, authentication, authorization, privileged accounts, or account lifecycle
+   - **Data Protection** questions: +1.5 points if SOW involves data handling, encryption, confidentiality, data classification, or privacy requirements
+   - **Regulatory Compliance** questions: +1.5 points if healthcare context (HIPAA, PCI, SOC2) or compliance training mentioned in SOPs
+   - **Skill Alignment** questions: +1.5 points if SOW requires specific technical skills, competency verification, or capability assessment
+   - **Team Composition** questions: +1.5 points if SOW involves workforce augmentation, staff allocation, personnel roles, or resource management
+   - **Scope Clarity** questions: +1.5 points if SOW discusses deliverables, milestones, assumptions, dependencies, or scope boundaries
+   - **Vendor Coordination** questions: +1.5 points if SOW mentions third-party vendors, subcontractors, external partners, or supplier management
+   - **Governance Framework** questions: +1.5 points if SOW discusses decision-making, approval processes, change control, or governance structures
+   - **Stakeholder Engagement** questions: +1.5 points if SOW mentions meetings, status reports, escalation, communication plans, or stakeholder management
+   - **SLA/KPI Definition** questions: +1.5 points if SOW specifies service levels, performance metrics, KPIs, or measurement criteria
+   - **Performance Monitoring** questions: +1.5 points if SOW requires tracking, reporting, metrics collection, or performance measurement
+
+3. **SOW→SOP Linkage Context:** Emphasize questions that bridge SOW requirements and SOP implementation:
+   - SOW states WHAT is needed → SOP describes HOW to implement → Question validates the implementation
+   - Give preference to questions that assess procedural completeness from SOPs
+
+4. **Score Differentiation:** Avoid clustering scores - use the full 0-10 range with granularity:
+   - Use decimals if needed (e.g., 7.5, 8.2, 9.1)
+   - Ensure clear ranking - no ties unless genuinely equal relevance
+   - Top questions should score 8.5-10, moderate 6-8, low <6
+
 **Output Format (JSON):**
 Return a JSON object with a "results" key containing an array of scores:
 {{
   "results": [
     {{
       "question_id": "QUESTION_ID_001",
-      "score": 8,
-      "explanation": "Brief 1-2 sentence explanation of why this score"
+      "score": 8.5,
+      "explanation": "Brief explanation mentioning: 1) Direct SOW match OR SOP procedural link, 2) Why this matters for this specific engagement"
     }},
     ...
   ]
 }}
-
-Focus on:
-1. Direct alignment with stated SOW requirements
-2. Relevance to technical capabilities mentioned
-3. Importance for risk assessment
-4. Applicability to the engagement scope
 
 Return ONLY valid JSON, no other text."""
 

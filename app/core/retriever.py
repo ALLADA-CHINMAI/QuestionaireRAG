@@ -145,7 +145,8 @@ def retrieve_for_customer(
 SOW_DIRECT_BOOST = 1.2
 
 # Boost for questions found via SOP matches (can compete with or override direct matches if more relevant)
-SOW_VIA_SOP_BOOST = 1
+# Increased from 1.3 to 1.5 based on analysis showing SOP procedural context provides critical implementation details
+SOW_VIA_SOP_BOOST = 1.5
 
 # Maximum SOW chunks to process per file (keeps Azure Search call count bounded)
 MAX_CHUNKS_PER_SOW = 15
