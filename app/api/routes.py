@@ -66,12 +66,14 @@ class SowQuestionResult(BaseModel):
     question_id: str
     category: str
     question: str
-    score: float = Field(..., description="Hybrid score (direct SOW matches boosted 1.5×)")
+    score: float = Field(..., description="GPT-4o relevance score (0-10) or hybrid score if GPT-4o disabled")
+    vector_score: Optional[float] = Field(None, description="Original vector search score (0-1)")
     match_path: str = Field(..., description="'Direct SOW match' or 'SOW → SOP (capability)'")
-    sow_context: str = Field(..., description="First 150 chars of the matching SOW chunk")
+    sow_context: str = Field(..., description="Matching SOW chunk context")
     sow_filename: str
-    sop_context: Optional[str] = Field(None, description="First 150 chars of the matching SOP chunk")
+    sop_context: Optional[str] = Field(None, description="Matching SOP chunk context")
     sop_capability: Optional[str] = Field(None, description="Capability label of the matched SOP")
+    explanation: Optional[str] = Field(None, description="GPT-4o explanation of relevance")
 
 
 class SowQueryResponse(BaseModel):
@@ -249,16 +251,17 @@ async def upload_and_index_questions(
 async def query_with_sow(
     files: List[UploadFile] = File(...),
     top_n: int = Form(default=20),
+    use_gpt4o_reranking: bool = Form(default=True),
 ):
     """
     Upload one or more SOW files (.docx / .pdf / .xlsx) and retrieve the most
     relevant questions from the custom questions index.
 
-    Combines two retrieval paths:
-      1. Direct SOW → Questions (1.5× score boost)
-      2. SOW → SOP → Questions (base score, capability-mediated)
+    Two-stage retrieval:
+      1. Vector Search: SOW → Questions (1.2× boost) + SOP context
+      2. GPT-4o Re-ranking: Deep semantic analysis for top 50 candidates
 
-    Returns top_n questions with supporting context showing which path matched.
+    Returns top_n questions with GPT-4o scores (0-10) and explanations.
     """
     from app.core.indexer import sop_index_is_built, questions_index_is_built
     from app.core.retriever import retrieve_for_sow
@@ -292,7 +295,11 @@ async def query_with_sow(
             saved_paths.append(str(dest))
             logger.info(f"Saved SOW: {dest}")
 
-        result = retrieve_for_sow(sow_file_paths=saved_paths, top_n=top_n)
+        result = retrieve_for_sow(
+            sow_file_paths=saved_paths, 
+            top_n=top_n,
+            use_gpt4o_reranking=use_gpt4o_reranking
+        )
         logger.info(f"SOW query returned {result['total_results']} questions")
     except FileNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e))

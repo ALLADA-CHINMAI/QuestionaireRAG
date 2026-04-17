@@ -25,7 +25,7 @@
     header h1 { font-size: 1.3rem; font-weight: 600; }
     header span { font-size: 0.85rem; opacity: 0.7; margin-left: auto; }
 
-    .container { max-width: 980px; margin: 32px auto; padding: 0 20px; }
+    .container { max-width: 1600px; margin: 32px auto; padding: 0 20px; }
 
     /* Step label */
     .step-label {
@@ -134,10 +134,14 @@
       padding: 9px 22px; border: none; border-radius: 7px;
       font-size: 0.9rem; font-weight: 600; cursor: pointer;
       transition: background 0.2s;
+      display: inline-flex; align-items: center;
     }
     .btn-primary { background: #0f3460; color: white; }
     .btn-primary:hover:not(:disabled) { background: #16213e; }
     .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-secondary { background: #6c757d; color: white; padding: 7px 16px; font-size: 0.82rem; }
+    .btn-secondary:hover:not(:disabled) { background: #5a6268; }
+    .btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
     .btn-warning { background: #e65100; color: white; margin-top: 16px; }
     .btn-warning:hover:not(:disabled) { background: #bf360c; }
     .btn-warning:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -180,8 +184,8 @@
     tbody tr:hover { background: #f8fafd; }
     tbody td { padding: 10px 12px; vertical-align: top; }
     td.rank { font-weight: 700; color: #0f3460; width: 34px; text-align: center; }
-    td.question-text { line-height: 1.5; max-width: 380px; }
-    td.context-cell { max-width: 240px; }
+    td.question-text { line-height: 1.5; max-width: 450px; }
+    td.context-cell { /* No max-width constraint */ }
     .category-badge {
       display: inline-block; padding: 2px 9px; border-radius: 12px;
       font-size: 0.74rem; font-weight: 600; white-space: nowrap;
@@ -202,8 +206,8 @@
     .context-path.via-sop { background: #f3e5f5; color: #6a1b9a; }
     .context-snippet {
       display: block; color: #777; font-style: italic;
-      overflow: hidden; display: -webkit-box;
-      -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      line-height: 1.6;
+      /* No line clamp - show full text */
     }
     .context-file { font-size: 0.72rem; color: #999; margin-top: 3px; }
   </style>
@@ -345,6 +349,23 @@
     <div id="results-header">
       <h2>Recommended Questions</h2>
       <span id="results-count"></span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="downloadResults()" title="Download results as CSV">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Download Results
+        </button>
+        <button class="btn btn-secondary" onclick="downloadUploadedFiles()" title="Download list of uploaded files">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          Download Files List
+        </button>
+      </div>
     </div>
     <table>
       <thead>
@@ -353,7 +374,9 @@
           <th>Question ID</th>
           <th>Category</th>
           <th>Question</th>
-          <th>Score</th>
+          <th>Vector Score</th>
+          <th>GPT-4o Score</th>
+          <th>Explanation</th>
           <th>Supporting Context</th>
         </tr>
       </thead>
@@ -372,6 +395,8 @@ let sowFiles = [];
 
 let sopIndexReady = false;
 let qIndexReady   = false;
+
+let lastResultsData = null;  // Store last query results for download
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -604,37 +629,73 @@ function clearResults() {
   document.getElementById('results-card').style.display = 'none';
   document.getElementById('results-body').innerHTML = '';
   hideError('query-error');
+  lastResultsData = null;
 }
 
 function renderResults(data) {
-  const maxScore = Math.max(...data.questions.map(q => q.score), 0.0001);
+  lastResultsData = data;  // Store for downloads
+  const maxVectorScore = Math.max(...data.questions.map(q => q.vector_score || q.score), 0.0001);
+  const maxGPT4oScore = Math.max(...data.questions.map(q => q.score), 0.0001);
+  const hasExplanations = data.questions.some(q => q.explanation);
 
   document.getElementById('results-body').innerHTML = data.questions.map(q => {
-    const pct = Math.round((q.score / maxScore) * 100);
     const isDirect = q.match_path === 'Direct SOW match';
     const pathClass = isDirect ? 'direct' : 'via-sop';
+    
+    // Vector score (always present)
+    const vectorScore = q.vector_score || q.score;
+    const vectorPct = Math.round((vectorScore / maxVectorScore) * 100);
+    
+    // GPT-4o score (may be null if re-ranking failed)
+    const hasGPT4o = q.score >= 1;
+    const gpt4oScore = hasGPT4o ? q.score : null;
+    const gpt4oPct = gpt4oScore ? Math.round((gpt4oScore / 10) * 100) : 0;
 
     const contextBlock = `
       <div class="context-block">
         <span class="context-path ${pathClass}">${esc(q.match_path)}</span><br/>
-        <span class="context-snippet">${esc(q.sow_context || '')}</span>
-        <span class="context-file">SOW: ${esc(q.sow_filename || '')}</span>
-        ${q.sop_context ? `<span class="context-snippet" style="margin-top:4px">${esc(q.sop_context)}</span>` : ''}
-        ${q.sop_capability ? `<span class="context-file">SOP capability: ${esc(q.sop_capability)}</span>` : ''}
+        
+        <div style="margin-top:8px">
+          <strong style="font-size:0.75rem;color:#0f3460;display:block;margin-bottom:4px">📄 SOW Context:</strong>
+          <span class="context-snippet" style="display:block;color:#555;line-height:1.6;margin-bottom:4px">${esc(q.sow_context || '')}</span>
+          <span class="context-file" style="color:#999;font-size:0.72rem;font-style:italic">Source: ${esc(q.sow_filename || '')}</span>
+        </div>
+        
+        ${q.sop_context ? `
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #ddd">
+          <strong style="font-size:0.75rem;color:#6a1b9a;display:block;margin-bottom:4px">📋 SOP Context:</strong>
+          <span class="context-snippet" style="display:block;color:#555;line-height:1.6">${esc(q.sop_context)}</span>
+        </div>
+        ` : ''}
       </div>`;
+    
+    const explanationText = q.explanation ? 
+      `<span style="color:#333;line-height:1.5">${esc(q.explanation)}</span>` : 
+      '<span style="color:#999;font-style:italic">No GPT-4o analysis</span>';
 
     return `<tr>
       <td class="rank">${q.rank}</td>
       <td><code style="font-size:0.8rem">${esc(q.question_id)}</code></td>
       <td><span class="category-badge">${esc(q.category)}</span></td>
       <td class="question-text">${esc(q.question)}</td>
-      <td>
+      <td style="min-width:100px">
         <div class="score-bar-wrap">
-          <div class="score-bar"><div class="score-bar-fill" style="width:${pct}%"></div></div>
-          <span class="score-val">${q.score.toFixed(3)}</span>
+          <div class="score-bar"><div class="score-bar-fill" style="width:${vectorPct}%"></div></div>
+          <span class="score-val">${vectorScore.toFixed(3)}</span>
         </div>
       </td>
-      <td class="context-cell">${contextBlock}</td>
+      <td style="min-width:100px">
+        ${hasGPT4o ? `
+          <div class="score-bar-wrap">
+            <div class="score-bar"><div class="score-bar-fill" style="width:${gpt4oPct}%;background:#2e7d32"></div></div>
+            <span class="score-val" style="color:#2e7d32;font-weight:600">${gpt4oScore.toFixed(1)}/10</span>
+          </div>
+        ` : '<span style="color:#999;font-style:italic;font-size:0.8rem">N/A</span>'}
+      </td>
+      <td class="context-cell" style="min-width:300px;font-size:0.82rem;line-height:1.6;color:#333;padding-right:16px">
+        ${explanationText}
+      </td>
+      <td class="context-cell" style="min-width:350px">${contextBlock}</td>
     </tr>`;
   }).join('');
 
@@ -704,6 +765,97 @@ function setupDrop(zoneId, inputId, exts, onFiles, multiple) {
     onFiles([...e.target.files]);
     e.target.value = '';
   });
+}
+
+// ── Downloads ──────────────────────────────────────────────────────────────
+function downloadResults() {
+  if (!lastResultsData || !lastResultsData.questions || lastResultsData.questions.length === 0) {
+    alert('No results to download. Please run a query first.');
+    return;
+  }
+
+  // Build CSV content
+  const headers = ['Rank', 'Question ID', 'Category', 'Question', 'Vector Score', 'GPT-4o Score', 'Explanation', 'Match Path', 'SOW Context', 'SOW Filename', 'SOP Context'];
+  const rows = lastResultsData.questions.map(q => [
+    q.rank || '',
+    q.question_id || '',
+    q.category || '',
+    q.question || '',
+    q.vector_score?.toFixed(3) || q.score?.toFixed(3) || '',
+    (q.score >= 1 ? q.score.toFixed(1) : 'N/A'),
+    q.explanation || 'No GPT-4o analysis',
+    q.match_path || '',
+    q.sow_context || '',
+    q.sow_filename || '',
+    q.sop_context || ''
+  ]);
+
+  const csvContent = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  downloadCSV(csvContent, `QuestionnaireRAG_Results_${getTimestamp()}.csv`);
+}
+
+function downloadUploadedFiles() {
+  const files = [];
+  
+  // Add SOPs
+  if (sopFiles.length > 0) {
+    files.push('=== SOP Files ===');
+    sopFiles.forEach(({file, capability}) => {
+      files.push(`${file.name} (Capability: ${capability || 'N/A'})`);
+    });
+    files.push('');
+  }
+  
+  // Add Questions file
+  if (qFile) {
+    files.push('=== Questions File ===');
+    files.push(qFile.name);
+    files.push('');
+  }
+  
+  // Add SOWs
+  if (sowFiles.length > 0) {
+    files.push('=== SOW Files ===');
+    sowFiles.forEach(f => files.push(f.name));
+  }
+  
+  if (files.length === 0) {
+    alert('No files uploaded yet.');
+    return;
+  }
+  
+  const content = files.join('\n');
+  downloadTXT(content, `Uploaded_Files_${getTimestamp()}.txt`);
+}
+
+function downloadCSV(content, filename) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(blob, filename);
+}
+
+function downloadTXT(content, filename) {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+  downloadBlob(blob, filename);
+}
+
+function downloadBlob(blob, filename) {
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function getTimestamp() {
+  const now = new Date();
+  return now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
 }
 </script>
 </body>

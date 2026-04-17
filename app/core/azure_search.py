@@ -211,7 +211,7 @@ class AzureSearchClient:
                 vector=query_vector,
                 k_nearest_neighbors=50,
                 fields="vector",
-                weight=1,  # Adjust weight to favor vector relevance
+                weight=0.7,  # Adjust weight to favor vector relevance
             )
             params: Dict[str, Any] = {
                 "vector_queries": [vector_query],
@@ -263,7 +263,7 @@ class AzureSearchClient:
                 vector=query_vector,
                 k_nearest_neighbors=50,
                 fields="vector",
-                weight=1,  # Adjust weight to favor vector relevance
+                weight=0.7,  # Adjust weight to favor vector relevance
             )
             params: Dict[str, Any] = {
                 "vector_queries": [vector_query],
