@@ -155,10 +155,12 @@ MAX_CHUNKS_PER_SOW = 15
 TOP_SOP_MATCHES = 5
 
 # Questions to search per SOP chunk (via SOP path)
+# 5 SOPs × 8 questions = 40 candidates per SOW chunk
 TOP_QUESTIONS_PER_SOP = 8
 
 # Direct question matches per SOW chunk
-TOP_DIRECT_QUESTIONS = 10
+# Increased from 10 to 20 to balance with Via SOP path (which gets ~40 candidates)
+TOP_DIRECT_QUESTIONS = 20
 
 # Questions retrieved per SOP capability match
 TOP_QUESTIONS_PER_CAPABILITY = 5
